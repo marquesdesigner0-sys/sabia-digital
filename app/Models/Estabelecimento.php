@@ -26,6 +26,8 @@ class Estabelecimento extends Model
         'aceita_retirada',
         'taxa_entrega',
         'horario',
+        'promocao',
+        'promocao_imagem',
         'aberto',
         'status',
         'aprovado_em',
@@ -50,5 +52,10 @@ class Estabelecimento extends Model
     public function itensCardapio(): HasMany
     {
         return $this->hasMany(ItemCardapio::class);
+    }
+
+    public function promocoes(): HasMany
+    {
+        return $this->hasMany(Promocao::class);
     }
 }

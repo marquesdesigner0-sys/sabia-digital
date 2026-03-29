@@ -12,6 +12,8 @@ class Noticia extends Model
         'titulo',
         'conteudo',
         'resumo',
+        'categoria',
+        'imagem',
         'publicado',
         'publicado_em',
     ];
@@ -19,7 +21,7 @@ class Noticia extends Model
     protected function casts(): array
     {
         return [
-            'publicado' => 'boolean',
+            'publicado'    => 'boolean',
             'publicado_em' => 'datetime',
         ];
     }

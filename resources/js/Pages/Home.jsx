@@ -23,6 +23,13 @@ const modulosInternos = [
         descricao: 'Cursos, treinamentos e marketplace',
         cor: 'border-emerald-400 hover:bg-emerald-50',
     },
+    {
+        href: '/informacoes',
+        emoji: '📰',
+        titulo: 'Informações',
+        descricao: 'Notícias, eventos e editais',
+        cor: 'border-blue-400 hover:bg-blue-50',
+    },
 ];
 
 const modulosExternos = [

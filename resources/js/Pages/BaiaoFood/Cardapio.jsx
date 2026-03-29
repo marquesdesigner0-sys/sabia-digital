@@ -352,7 +352,7 @@ export default function Cardapio({ estabelecimento, cardapio }) {
     const [modal, setModal] = useState(null); // null | 'tipo' | 'endereco' | 'pix'
     const [tipoEntrega, setTipoEntrega] = useState(null);
     const [endereco, setEndereco] = useState(null);
-    const temPromocao = !!(estabelecimento.promocao || estabelecimento.promocao_imagem);
+    const temPromocao = (estabelecimento.promocoes ?? []).length > 0;
     const [aba, setAba] = useState('cardapio');
 
     const categorias = Object.keys(cardapio);
@@ -492,45 +492,44 @@ export default function Cardapio({ estabelecimento, cardapio }) {
                             }`}>
                             Cardápio
                         </button>
-                        {temPromocao && (
-                            <button
-                                onClick={() => setAba('promocoes')}
-                                className={`relative border-b-2 px-5 py-3 text-sm font-medium transition ${
-                                    aba === 'promocoes'
-                                        ? 'border-orange-500 text-orange-600'
-                                        : 'border-transparent text-stone-500 hover:text-stone-800'
-                                }`}>
-                                🏷️ Promoções
-                                {aba !== 'promocoes' && (
-                                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-orange-500" />
-                                )}
-                            </button>
-                        )}
+                        <button
+                            onClick={() => setAba('promocoes')}
+                            className={`relative border-b-2 px-5 py-3 text-sm font-medium transition ${
+                                aba === 'promocoes'
+                                    ? 'border-orange-500 text-orange-600'
+                                    : 'border-transparent text-stone-500 hover:text-stone-800'
+                            }`}>
+                            🏷️ Promoções
+                            {temPromocao && aba !== 'promocoes' && (
+                                <span className="absolute top-2 right-1 h-2 w-2 rounded-full bg-orange-500" />
+                            )}
+                        </button>
                     </div>
                 </div>
 
                 {/* Conteúdo da aba Promoções */}
                 {aba === 'promocoes' && (
-                    <div className="mx-auto max-w-3xl px-4 py-6">
-                        {estabelecimento.promocao_imagem ? (
-                            <div className="overflow-hidden rounded-2xl shadow-sm ring-1 ring-stone-200">
-                                <img
-                                    src={estabelecimento.promocao_imagem}
-                                    alt="Promoção"
-                                    className="w-full object-cover"
-                                />
+                    <div className="mx-auto max-w-3xl px-4 py-6 space-y-4">
+                        {!temPromocao ? (
+                            <div className="rounded-2xl bg-white p-10 text-center ring-1 ring-stone-200">
+                                <p className="text-2xl mb-2">🏷️</p>
+                                <p className="text-sm text-stone-400">Nenhuma promoção ativa no momento.</p>
                             </div>
-                        ) : (
-                            <div className="flex items-start gap-4 rounded-2xl bg-amber-400 px-6 py-5 shadow-sm">
-                                <span className="text-3xl shrink-0">🏷️</span>
-                                <div>
-                                    <p className="text-xs font-bold uppercase tracking-wide text-amber-900 mb-1">Promoção ativa</p>
-                                    <p className="text-sm font-medium text-amber-950 whitespace-pre-wrap leading-relaxed">
-                                        {estabelecimento.promocao}
-                                    </p>
+                        ) : (estabelecimento.promocoes ?? []).map((p) => (
+                            p.tipo === 'imagem' ? (
+                                <div key={p.id} className="overflow-hidden rounded-2xl shadow-sm ring-1 ring-stone-200">
+                                    <img src={p.imagem} alt="Promoção" className="w-full object-cover" />
                                 </div>
-                            </div>
-                        )}
+                            ) : (
+                                <div key={p.id} className="flex items-start gap-4 rounded-2xl bg-amber-400 px-6 py-5 shadow-sm">
+                                    <span className="text-3xl shrink-0">🏷️</span>
+                                    <div>
+                                        <p className="text-xs font-bold uppercase tracking-wide text-amber-900 mb-1">Promoção</p>
+                                        <p className="text-sm font-medium text-amber-950 whitespace-pre-wrap leading-relaxed">{p.texto}</p>
+                                    </div>
+                                </div>
+                            )
+                        ))}
                     </div>
                 )}
 

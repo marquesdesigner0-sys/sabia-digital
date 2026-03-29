@@ -8,6 +8,7 @@ use App\Http\Controllers\DocumentoMatriculaController;
 use App\Http\Controllers\EmpreendedorController;
 use App\Http\Controllers\EscolaController;
 use App\Http\Controllers\MatriculaController;
+use App\Http\Controllers\NoticiaController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -56,11 +57,17 @@ Route::middleware('auth')->group(function () {
         Route::put('/empreendedor/painel/{estabelecimento}', [EmpreendedorController::class, 'atualizar'])->name('empreendedor.atualizar');
         Route::post('/empreendedor/painel/{estabelecimento}/toggle-aberto', [EmpreendedorController::class, 'toggleAberto'])->name('empreendedor.toggle-aberto');
         Route::post('/empreendedor/painel/{estabelecimento}/itens', [EmpreendedorController::class, 'adicionarItem'])->name('empreendedor.itens.store');
-        Route::post('/empreendedor/painel/{estabelecimento}/promocao', [EmpreendedorController::class, 'salvarPromocao'])->name('empreendedor.promocao');
+        Route::post('/empreendedor/painel/{estabelecimento}/promocoes', [EmpreendedorController::class, 'adicionarPromocao'])->name('empreendedor.promocoes.store');
+        Route::post('/empreendedor/promocoes/{promocao}/toggle', [EmpreendedorController::class, 'togglePromocao'])->name('empreendedor.promocoes.toggle');
+        Route::delete('/empreendedor/promocoes/{promocao}', [EmpreendedorController::class, 'removerPromocao'])->name('empreendedor.promocoes.destroy');
         Route::post('/empreendedor/itens/{item}/toggle', [EmpreendedorController::class, 'toggleItem'])->name('empreendedor.itens.toggle');
         Route::post('/empreendedor/itens/{item}', [EmpreendedorController::class, 'editarItem'])->name('empreendedor.itens.update');
         Route::delete('/empreendedor/itens/{item}', [EmpreendedorController::class, 'removerItem'])->name('empreendedor.itens.destroy');
     });
+
+    // Informações públicas — notícias, eventos, editais
+    Route::get('/informacoes', [NoticiaController::class, 'index'])->name('noticias.index');
+    Route::get('/informacoes/{noticia}', [NoticiaController::class, 'show'])->name('noticias.show');
 
     // Educação
     Route::get('/educacao', [EscolaController::class, 'index'])->name('educacao.index');

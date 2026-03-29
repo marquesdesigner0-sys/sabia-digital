@@ -462,15 +462,14 @@ function FormEditarItem({ item, onCancelar }) {
     );
 }
 
-function FormPromocao({ estabelecimento }) {
-    const temAtiva = !!(estabelecimento.promocao || estabelecimento.promocao_imagem);
-    const [modo, setModo] = useState(estabelecimento.promocao_imagem ? 'imagem' : 'texto');
-    const [previewImg, setPreviewImg] = useState(estabelecimento.promocao_imagem ?? null);
+function FormNovaPromocao({ estabelecimentoId, onCancelar }) {
+    const [modo, setModo] = useState('texto');
+    const [previewImg, setPreviewImg] = useState(null);
 
     const { data, setData, post, processing, errors, reset } = useForm({
-        tipo:             modo,
-        promocao:         estabelecimento.promocao ?? '',
-        promocao_imagem:  null,
+        tipo:   'texto',
+        texto:  '',
+        imagem: null,
     });
 
     function escolherModo(m) {
@@ -481,124 +480,149 @@ function FormPromocao({ estabelecimento }) {
     function onImagemChange(e) {
         const file = e.target.files[0];
         if (!file) return;
-        setData((d) => ({ ...d, promocao_imagem: file }));
+        setData((d) => ({ ...d, imagem: file }));
         setPreviewImg(URL.createObjectURL(file));
     }
 
     function salvar(e) {
         e.preventDefault();
-        post(`/empreendedor/painel/${estabelecimento.id}/promocao`, { forceFormData: true });
-    }
-
-    function remover() {
-        if (!confirm('Remover a promoção ativa?')) return;
-        post(`/empreendedor/painel/${estabelecimento.id}/promocao`, {
-            data: { tipo: 'remover' },
+        post(`/empreendedor/painel/${estabelecimentoId}/promocoes`, {
+            forceFormData: true,
+            onSuccess: () => { reset(); setPreviewImg(null); onCancelar(); },
         });
     }
 
     return (
-        <div className="space-y-5">
-            {/* Preview da promoção ativa */}
-            {temAtiva && (
-                <div className="rounded-xl ring-1 ring-amber-300 overflow-hidden">
-                    <div className="flex items-center justify-between bg-amber-50 px-4 py-2.5">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Promoção ativa agora</p>
-                        <button type="button" onClick={remover}
-                            className="text-xs text-red-500 hover:underline font-medium">
-                            Remover promoção
-                        </button>
-                    </div>
-                    {estabelecimento.promocao_imagem ? (
-                        <img src={estabelecimento.promocao_imagem} alt="Promoção" className="w-full object-cover max-h-64" />
-                    ) : (
-                        <div className="flex items-start gap-3 bg-amber-400 px-4 py-3">
-                            <span className="text-xl shrink-0">🏷️</span>
-                            <p className="text-sm font-medium text-amber-950 whitespace-pre-wrap leading-relaxed">
-                                {estabelecimento.promocao}
-                            </p>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Toggle tipo */}
-            <div>
-                <p className="mb-2 text-sm font-medium text-stone-700">
-                    {temAtiva ? 'Alterar promoção' : 'Nova promoção'} — escolha o formato:
-                </p>
-                <div className="flex gap-2">
-                    <button type="button" onClick={() => escolherModo('texto')}
-                        className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                            modo === 'texto' ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                        }`}>
-                        ✏️ Texto
-                    </button>
-                    <button type="button" onClick={() => escolherModo('imagem')}
-                        className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                            modo === 'imagem' ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                        }`}>
-                        🖼️ Imagem
-                    </button>
-                </div>
+        <div className="rounded-xl bg-orange-50 p-4 ring-1 ring-orange-200 space-y-4">
+            <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-orange-800">Nova promoção</p>
+                <button type="button" onClick={onCancelar} className="text-xs text-stone-400 hover:text-stone-600">✕ Cancelar</button>
             </div>
 
-            <form onSubmit={salvar} className="space-y-4">
+            <div className="flex gap-2">
+                {['texto', 'imagem'].map((m) => (
+                    <button key={m} type="button" onClick={() => escolherModo(m)}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                            modo === m ? 'bg-stone-800 text-white' : 'bg-white text-stone-600 ring-1 ring-stone-200 hover:bg-stone-50'
+                        }`}>
+                        {m === 'texto' ? '✏️ Texto' : '🖼️ Imagem'}
+                    </button>
+                ))}
+            </div>
+
+            <form onSubmit={salvar} className="space-y-3">
                 {modo === 'texto' && (
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-stone-700">
-                            Texto da promoção
-                            <span className="ml-1 font-normal text-stone-400">(máx. 500 caracteres)</span>
-                        </label>
                         <textarea
-                            value={data.promocao}
-                            onChange={(e) => setData('promocao', e.target.value)}
-                            rows={4}
+                            value={data.texto}
+                            onChange={(e) => setData('texto', e.target.value)}
+                            rows={3}
                             maxLength={500}
                             className="input"
-                            placeholder={'Ex: 🍕 Pizza grande por R$ 29,90 toda sexta!\nEx: Compre 2 X-burguer e ganhe 1 refri grátis.\nEx: Marmita do dia: arroz, feijão, frango e salada — R$ 12,00'}
+                            placeholder="Ex: 🍕 Pizza grande por R$ 29,90 toda sexta!"
                         />
-                        <p className="mt-1 text-right text-xs text-stone-400">{data.promocao.length}/500</p>
-                        <p className="mt-1 text-xs text-stone-500">Aparece como card amarelo no topo do cardápio.</p>
+                        <p className="mt-0.5 text-right text-xs text-stone-400">{data.texto.length}/500</p>
+                        {errors.texto && <p className="text-xs text-red-600">{errors.texto}</p>}
                     </div>
                 )}
 
                 {modo === 'imagem' && (
-                    <div>
-                        <label className="mb-1 block text-sm font-medium text-stone-700">
-                            Card de promoção
-                            <span className="ml-1 font-normal text-stone-400">(PNG ou JPG · 1350×1080 recomendado · máx. 4 MB)</span>
-                        </label>
-
+                    <div className="space-y-2">
                         {previewImg && (
-                            <div className="mb-3 overflow-hidden rounded-xl ring-1 ring-stone-200">
-                                <img src={previewImg} alt="Preview" className="w-full object-cover max-h-56" />
+                            <div className="overflow-hidden rounded-lg ring-1 ring-stone-200">
+                                <img src={previewImg} alt="Preview" className="w-full object-cover max-h-48" />
                             </div>
                         )}
-
-                        <input
-                            type="file"
-                            accept="image/png,image/jpeg"
-                            onChange={onImagemChange}
-                            className="block text-xs text-stone-600 file:mr-2 file:rounded-lg file:border-0 file:bg-amber-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-amber-700 hover:file:bg-amber-100"
-                        />
-                        {errors.promocao_imagem && (
-                            <p className="mt-1 text-xs text-red-600">{errors.promocao_imagem}</p>
-                        )}
-                        <p className="mt-2 text-xs text-stone-500">
-                            Crie o card no Canva no formato <strong>1350×1080 px</strong> e exporte como PNG ou JPG.
-                            Ele será exibido em largura total no topo do cardápio.
-                        </p>
+                        <input type="file" accept="image/png,image/jpeg" onChange={onImagemChange}
+                            className="block text-xs text-stone-600 file:mr-2 file:rounded-lg file:border-0 file:bg-orange-50 file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-orange-700 hover:file:bg-orange-100" />
+                        <p className="text-xs text-stone-500">PNG ou JPG · 1350×1080 px recomendado · máx. 4 MB</p>
+                        {errors.imagem && <p className="text-xs text-red-600">{errors.imagem}</p>}
                     </div>
                 )}
 
-                <button
-                    type="submit"
-                    disabled={processing || (modo === 'texto' && !data.promocao.trim()) || (modo === 'imagem' && !data.promocao_imagem)}
-                    className="rounded-xl bg-orange-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-orange-600 disabled:opacity-50 transition">
-                    {processing ? 'Salvando…' : temAtiva ? 'Atualizar promoção' : 'Publicar promoção'}
+                <button type="submit"
+                    disabled={processing || (modo === 'texto' && !data.texto.trim()) || (modo === 'imagem' && !data.imagem)}
+                    className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-bold text-white hover:bg-orange-600 disabled:opacity-50 transition">
+                    {processing ? 'Salvando…' : 'Publicar promoção'}
                 </button>
             </form>
+        </div>
+    );
+}
+
+function FormPromocao({ estabelecimento }) {
+    const [adicionando, setAdicionando] = useState(false);
+
+    function toggle(id) {
+        router.post(`/empreendedor/promocoes/${id}/toggle`);
+    }
+
+    function remover(id) {
+        if (!confirm('Remover esta promoção?')) return;
+        router.delete(`/empreendedor/promocoes/${id}`);
+    }
+
+    const { promocoes = [] } = estabelecimento;
+
+    return (
+        <div className="space-y-4">
+            {/* Lista de promoções */}
+            {promocoes.length > 0 && (
+                <div className="space-y-3">
+                    {promocoes.map((p) => (
+                        <div key={p.id} className={`rounded-xl overflow-hidden ring-1 ${p.ativa ? 'ring-orange-300' : 'ring-stone-200 opacity-60'}`}>
+                            {/* Cabeçalho */}
+                            <div className="flex items-center justify-between bg-stone-50 px-4 py-2.5 gap-3">
+                                <div className="flex items-center gap-2">
+                                    <span className={`h-2 w-2 rounded-full ${p.ativa ? 'bg-green-500' : 'bg-stone-300'}`} />
+                                    <span className="text-xs font-medium text-stone-600">
+                                        {p.tipo === 'imagem' ? '🖼️ Card de imagem' : '✏️ Texto'}
+                                    </span>
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${p.ativa ? 'bg-green-100 text-green-700' : 'bg-stone-100 text-stone-500'}`}>
+                                        {p.ativa ? 'Ativa' : 'Inativa'}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <button onClick={() => toggle(p.id)}
+                                        className="text-xs text-amber-600 hover:underline font-medium">
+                                        {p.ativa ? 'Pausar' : 'Ativar'}
+                                    </button>
+                                    <button onClick={() => remover(p.id)}
+                                        className="text-xs text-red-500 hover:underline font-medium">
+                                        Remover
+                                    </button>
+                                </div>
+                            </div>
+                            {/* Conteúdo */}
+                            {p.tipo === 'imagem' ? (
+                                <img src={p.imagem} alt="Promoção" className="w-full object-cover max-h-48" />
+                            ) : (
+                                <div className="bg-amber-400 px-4 py-3 flex items-start gap-2">
+                                    <span className="text-lg shrink-0">🏷️</span>
+                                    <p className="text-sm font-medium text-amber-950 whitespace-pre-wrap leading-relaxed">{p.texto}</p>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {promocoes.length === 0 && !adicionando && (
+                <p className="py-4 text-center text-sm text-stone-400">Nenhuma promoção cadastrada ainda.</p>
+            )}
+
+            {/* Formulário de nova promoção */}
+            {adicionando ? (
+                <FormNovaPromocao
+                    estabelecimentoId={estabelecimento.id}
+                    onCancelar={() => setAdicionando(false)}
+                />
+            ) : (
+                <button onClick={() => setAdicionando(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-orange-300 py-3 text-sm font-medium text-orange-600 hover:border-orange-400 hover:bg-orange-50 transition">
+                    + Adicionar promoção
+                </button>
+            )}
         </div>
     );
 }

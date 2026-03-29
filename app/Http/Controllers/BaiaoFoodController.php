@@ -16,7 +16,7 @@ class BaiaoFoodController extends Controller
 
     public function index(): Response
     {
-        $estabelecimentos = Estabelecimento::with('itensCardapio')
+        $estabelecimentos = Estabelecimento::with(['itensCardapio', 'promocoes'])
             ->where('status', 'ativo')
             ->orderBy('nome')
             ->get()
@@ -34,6 +34,7 @@ class BaiaoFoodController extends Controller
                 'tem_whatsapp'    => ! empty($e->whatsapp),
                 'tem_pix'         => ! empty($e->chave_pix),
                 'total_itens'     => $e->itensCardapio->where('disponivel', true)->count(),
+                'tem_promocao'    => $e->promocoes->where('ativa', true)->count() > 0,
             ]);
 
         return Inertia::render('BaiaoFood/Index', [
@@ -44,6 +45,8 @@ class BaiaoFoodController extends Controller
     public function show(Estabelecimento $estabelecimento): Response
     {
         abort_if($estabelecimento->status !== 'ativo', 404);
+
+        $estabelecimento->load('promocoes');
 
         $itens = $estabelecimento->itensCardapio()
             ->where('disponivel', true)
@@ -75,8 +78,14 @@ class BaiaoFoodController extends Controller
                 'aceita_delivery' => $estabelecimento->aceita_delivery,
                 'aceita_retirada' => $estabelecimento->aceita_retirada,
                 'taxa_entrega'    => (float) $estabelecimento->taxa_entrega,
-                'promocao'        => $estabelecimento->promocao,
-                'promocao_imagem' => $estabelecimento->promocao_imagem ? Storage::url($estabelecimento->promocao_imagem) : null,
+                'promocoes'       => $estabelecimento->promocoes
+                    ->where('ativa', true)
+                    ->map(fn($p) => [
+                        'id'     => $p->id,
+                        'tipo'   => $p->tipo,
+                        'texto'  => $p->texto,
+                        'imagem' => $p->imagem ? Storage::url($p->imagem) : null,
+                    ])->values(),
             ],
             'cardapio' => $cardapio,
         ]);

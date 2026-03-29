@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Estabelecimento;
 use App\Models\ItemCardapio;
+use App\Models\Promocao;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -117,7 +118,7 @@ class EmpreendedorController extends Controller
 
     public function painel(Request $request): Response
     {
-        $estabelecimento = Estabelecimento::with('itensCardapio')
+        $estabelecimento = Estabelecimento::with(['itensCardapio', 'promocoes'])
             ->findOrFail($request->session()->get('estabelecimento_id'));
 
         return Inertia::render('Empreendedor/Painel', [
@@ -136,8 +137,13 @@ class EmpreendedorController extends Controller
                 'aceita_retirada' => $estabelecimento->aceita_retirada,
                 'taxa_entrega'    => (float) $estabelecimento->taxa_entrega,
                 'horario'         => $estabelecimento->horario,
-                'promocao'        => $estabelecimento->promocao,
-                'promocao_imagem' => $estabelecimento->promocao_imagem ? Storage::url($estabelecimento->promocao_imagem) : null,
+                'promocoes'       => $estabelecimento->promocoes->map(fn($p) => [
+                    'id'     => $p->id,
+                    'tipo'   => $p->tipo,
+                    'texto'  => $p->texto,
+                    'imagem' => $p->imagem ? Storage::url($p->imagem) : null,
+                    'ativa'  => $p->ativa,
+                ])->values(),
                 'aberto'          => $estabelecimento->aberto,
                 'status'          => $estabelecimento->status,
                 'itens'           => $estabelecimento->itensCardapio->map(fn($i) => [
@@ -287,52 +293,57 @@ class EmpreendedorController extends Controller
         return back();
     }
 
-    public function salvarPromocao(Request $request, Estabelecimento $estabelecimento): RedirectResponse
+    public function adicionarPromocao(Request $request, Estabelecimento $estabelecimento): RedirectResponse
     {
         abort_if($estabelecimento->id !== session('estabelecimento_id'), 403);
 
         $request->validate([
-            'tipo'            => ['required', 'in:texto,imagem,remover'],
-            'promocao'        => ['nullable', 'string', 'max:500'],
-            'promocao_imagem' => ['nullable', 'image', 'max:4096', 'mimes:png,jpg,jpeg'],
+            'tipo'   => ['required', 'in:texto,imagem'],
+            'texto'  => ['nullable', 'string', 'max:500'],
+            'imagem' => ['nullable', 'image', 'max:4096', 'mimes:png,jpg,jpeg'],
         ], [
-            'promocao_imagem.image' => 'O arquivo deve ser uma imagem.',
-            'promocao_imagem.max'   => 'A imagem deve ter no máximo 4 MB.',
-            'promocao_imagem.mimes' => 'Use PNG ou JPG.',
+            'imagem.image' => 'O arquivo deve ser uma imagem.',
+            'imagem.max'   => 'A imagem deve ter no máximo 4 MB.',
+            'imagem.mimes' => 'Use PNG ou JPG.',
         ]);
 
-        $dados = ['promocao' => null, 'promocao_imagem' => $estabelecimento->promocao_imagem];
-
-        if ($request->tipo === 'remover') {
-            if ($estabelecimento->promocao_imagem) {
-                Storage::disk('public')->delete($estabelecimento->promocao_imagem);
-            }
-            $dados = ['promocao' => null, 'promocao_imagem' => null];
-            $estabelecimento->update($dados);
-            return back()->with('sucesso', 'Promoção removida.');
-        }
-
         if ($request->tipo === 'texto') {
-            // Limpa imagem anterior se existir
-            if ($estabelecimento->promocao_imagem) {
-                Storage::disk('public')->delete($estabelecimento->promocao_imagem);
-            }
-            $dados = ['promocao' => $request->promocao ?: null, 'promocao_imagem' => null];
+            $request->validate(['texto' => ['required', 'string', 'max:500']]);
+            $estabelecimento->promocoes()->create([
+                'tipo'  => 'texto',
+                'texto' => $request->texto,
+                'ativa' => true,
+            ]);
         }
 
-        if ($request->tipo === 'imagem' && $request->hasFile('promocao_imagem')) {
-            if ($estabelecimento->promocao_imagem) {
-                Storage::disk('public')->delete($estabelecimento->promocao_imagem);
-            }
-            $dados = [
-                'promocao'        => null,
-                'promocao_imagem' => $request->file('promocao_imagem')->store('promocoes', 'public'),
-            ];
+        if ($request->tipo === 'imagem') {
+            $request->validate(['imagem' => ['required', 'image', 'max:4096', 'mimes:png,jpg,jpeg']]);
+            $path = $request->file('imagem')->store('promocoes', 'public');
+            $estabelecimento->promocoes()->create([
+                'tipo'   => 'imagem',
+                'imagem' => $path,
+                'ativa'  => true,
+            ]);
         }
 
-        $estabelecimento->update($dados);
+        return back()->with('sucesso', 'Promoção adicionada.');
+    }
 
-        return back()->with('sucesso', 'Promoção atualizada.');
+    public function togglePromocao(Promocao $promocao): RedirectResponse
+    {
+        abort_if($promocao->estabelecimento_id !== session('estabelecimento_id'), 403);
+        $promocao->update(['ativa' => ! $promocao->ativa]);
+        return back();
+    }
+
+    public function removerPromocao(Promocao $promocao): RedirectResponse
+    {
+        abort_if($promocao->estabelecimento_id !== session('estabelecimento_id'), 403);
+        if ($promocao->imagem) {
+            Storage::disk('public')->delete($promocao->imagem);
+        }
+        $promocao->delete();
+        return back()->with('sucesso', 'Promoção removida.');
     }
 
     public function removerItem(ItemCardapio $item): RedirectResponse

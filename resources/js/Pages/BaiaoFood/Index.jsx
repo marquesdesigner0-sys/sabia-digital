@@ -133,6 +133,11 @@ export default function BaiaoFoodIndex({ estabelecimentos }) {
                                             <div className="shrink-0 text-right">
                                                 <p className="text-xs text-stone-400">{e.total_itens} itens</p>
                                                 <p className="mt-1 text-sm font-medium text-amber-600">Ver cardápio →</p>
+                                                {e.tem_promocao && (
+                                                    <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-700 ring-1 ring-orange-200">
+                                                        🏷️ Promoção
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
