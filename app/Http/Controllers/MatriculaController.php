@@ -55,7 +55,7 @@ class MatriculaController extends Controller
 
     public function minhasMatriculas(): Response
     {
-        $matriculas = Matricula::with('escola')
+        $matriculas = Matricula::with(['escola', 'documentos'])
             ->where('user_id', auth()->id())
             ->latest()
             ->get()
@@ -66,14 +66,51 @@ class MatriculaController extends Controller
                 'serie_solicitada' => $m->serie_solicitada,
                 'status'           => $m->status,
                 'escola'           => $m->escola->nome,
+                'escola_id'        => $m->escola_id,
                 'created_at'       => $m->created_at->format('d/m/Y'),
                 'observacao'       => $m->observacao,
+                'renovacao_de'     => $m->renovacao_de,
+                'documentos'       => $m->documentos->map(fn($d) => [
+                    'id'           => $d->id,
+                    'tipo'         => $d->tipo,
+                    'nome_original' => $d->nome_original,
+                ])->values(),
             ]);
 
         return Inertia::render('Educacao/MinhasMatriculas', [
             'matriculas' => $matriculas,
             'sucesso'    => session('sucesso'),
         ]);
+    }
+
+    public function renovar(Request $request, Matricula $matricula): RedirectResponse
+    {
+        abort_if($matricula->user_id !== auth()->id(), 403);
+        abort_if($matricula->status !== 'aprovada', 422);
+
+        $request->validate([
+            'serie_solicitada' => ['required', 'string'],
+        ], [
+            'serie_solicitada.required' => 'Selecione a série para a renovação.',
+        ]);
+
+        $protocolo = $this->gerarProtocolo();
+
+        Matricula::create([
+            'user_id'          => auth()->id(),
+            'escola_id'        => $matricula->escola_id,
+            'aluno_nome'       => $matricula->aluno_nome,
+            'aluno_cpf'        => $matricula->aluno_cpf,
+            'aluno_nascimento' => $matricula->aluno_nascimento->format('Y-m-d'),
+            'serie_solicitada' => $request->serie_solicitada,
+            'status'           => 'pendente',
+            'protocolo'        => $protocolo,
+            'observacao'       => "Renovação da matrícula {$matricula->protocolo}",
+            'renovacao_de'     => $matricula->id,
+        ]);
+
+        return redirect()->route('educacao.minhas-matriculas')
+            ->with('sucesso', "Renovação solicitada! Protocolo: {$protocolo}");
     }
 
     private function gerarProtocolo(): string

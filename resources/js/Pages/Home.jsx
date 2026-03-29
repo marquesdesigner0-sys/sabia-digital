@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { Head, router } from '@inertiajs/react';
 
-const modulos = [
+const modulosInternos = [
     {
         href: '/educacao',
         emoji: '🎒',
@@ -10,9 +11,71 @@ const modulos = [
     },
 ];
 
+const modulosExternos = [
+    {
+        url: 'http://infraestruturacarnaiba.com.br:5001/',
+        emoji: '🏗️',
+        titulo: 'Urbanismo',
+        descricao: 'Serviços de infraestrutura e obras',
+        cor: 'border-orange-400 hover:bg-orange-50',
+    },
+];
+
+function ModalRedirecionamento({ modulo, onConfirmar, onCancelar }) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl ring-1 ring-stone-200">
+                <div className="mb-4 flex items-center gap-3">
+                    <span className="text-3xl">{modulo.emoji}</span>
+                    <div>
+                        <p className="font-semibold text-stone-800">{modulo.titulo}</p>
+                        <p className="text-xs text-stone-500">Site externo</p>
+                    </div>
+                </div>
+
+                <p className="text-sm text-stone-600">
+                    Você será direcionado para um site fora do Sabiá Digital:
+                </p>
+                <p className="mt-1 break-all rounded-lg bg-stone-50 px-3 py-2 text-xs font-mono text-stone-500 ring-1 ring-stone-200">
+                    {modulo.url}
+                </p>
+                <p className="mt-3 text-xs text-stone-400">
+                    O conteúdo deste site é de responsabilidade do órgão municipal correspondente.
+                </p>
+
+                <div className="mt-5 flex gap-2">
+                    <button
+                        onClick={onCancelar}
+                        className="flex-1 rounded-lg border border-stone-300 py-2.5 text-sm font-medium text-stone-600 transition hover:bg-stone-50"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={onConfirmar}
+                        className="flex-1 rounded-lg bg-orange-500 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
+                    >
+                        Continuar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function Home({ user }) {
+    const [moduloPendente, setModuloPendente] = useState(null);
+
     function logout() {
         router.post('/logout');
+    }
+
+    function abrirExterno(modulo) {
+        setModuloPendente(modulo);
+    }
+
+    function confirmarRedirecionamento() {
+        window.open(moduloPendente.url, '_blank', 'noopener,noreferrer');
+        setModuloPendente(null);
     }
 
     return (
@@ -43,7 +106,7 @@ export default function Home({ user }) {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                        {modulos.map((m) => (
+                        {modulosInternos.map((m) => (
                             <a
                                 key={m.href}
                                 href={m.href}
@@ -54,9 +117,30 @@ export default function Home({ user }) {
                                 <span className="mt-1 text-xs text-stone-500">{m.descricao}</span>
                             </a>
                         ))}
+
+                        {modulosExternos.map((m) => (
+                            <button
+                                key={m.url}
+                                onClick={() => abrirExterno(m)}
+                                className={`flex cursor-pointer flex-col rounded-2xl border-2 bg-white p-5 shadow-sm transition text-left ${m.cor}`}
+                            >
+                                <span className="text-3xl">{m.emoji}</span>
+                                <span className="mt-3 font-semibold text-stone-800">{m.titulo}</span>
+                                <span className="mt-1 text-xs text-stone-500">{m.descricao}</span>
+                                <span className="mt-2 text-xs text-orange-500">↗ Site externo</span>
+                            </button>
+                        ))}
                     </div>
                 </main>
             </div>
+
+            {moduloPendente && (
+                <ModalRedirecionamento
+                    modulo={moduloPendente}
+                    onConfirmar={confirmarRedirecionamento}
+                    onCancelar={() => setModuloPendente(null)}
+                />
+            )}
         </>
     );
 }

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CalendarioEscolarController;
+use App\Http\Controllers\DocumentoMatriculaController;
 use App\Http\Controllers\EscolaController;
 use App\Http\Controllers\MatriculaController;
 use Illuminate\Support\Facades\Route;
@@ -40,4 +41,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/educacao/matricula/{escola}', [MatriculaController::class, 'create'])->name('educacao.matricula');
     Route::post('/educacao/matricula/{escola}', [MatriculaController::class, 'store']);
     Route::get('/educacao/minhas-matriculas', [MatriculaController::class, 'minhasMatriculas'])->name('educacao.minhas-matriculas');
+    Route::post('/educacao/matricula/{matricula}/renovar', [MatriculaController::class, 'renovar'])->name('educacao.matricula.renovar');
+    Route::post('/educacao/matricula/{matricula}/documentos', [DocumentoMatriculaController::class, 'store'])->name('educacao.documentos.store');
+    Route::delete('/educacao/documento/{documento}', [DocumentoMatriculaController::class, 'destroy'])->name('educacao.documentos.destroy');
+    Route::get('/educacao/documento/{documento}/download', [DocumentoMatriculaController::class, 'download'])->name('educacao.documentos.download');
 });
