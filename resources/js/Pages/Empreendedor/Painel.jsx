@@ -1,6 +1,101 @@
 import { useState } from 'react';
 import { Head, useForm, router } from '@inertiajs/react';
 
+const DIAS_SEMANA = [
+    { id: 'dom', label: 'Domingo' },
+    { id: 'seg', label: 'Segunda' },
+    { id: 'ter', label: 'Terça' },
+    { id: 'qua', label: 'Quarta' },
+    { id: 'qui', label: 'Quinta' },
+    { id: 'sex', label: 'Sexta' },
+    { id: 'sab', label: 'Sábado' },
+];
+
+function parseHorario(raw) {
+    try { return JSON.parse(raw) || {}; } catch { return {}; }
+}
+
+function HorarioEditor({ value, onChange }) {
+    const [dias, setDias] = useState(() => {
+        const parsed = parseHorario(value);
+        return DIAS_SEMANA.reduce((acc, d) => {
+            acc[d.id] = parsed[d.id] ?? { aberto: false, de: '08:00', ate: '18:00' };
+            return acc;
+        }, {});
+    });
+
+    function atualizar(id, campo, val) {
+        const novo = { ...dias, [id]: { ...dias[id], [campo]: val } };
+        setDias(novo);
+        onChange(JSON.stringify(novo));
+    }
+
+    function toggleDia(id, aberto) {
+        const novo = { ...dias, [id]: { ...dias[id], aberto } };
+        setDias(novo);
+        onChange(JSON.stringify(novo));
+    }
+
+    function copiarUteis() {
+        const seg = dias['seg'];
+        const novo = { ...dias };
+        ['seg','ter','qua','qui','sex'].forEach(d => {
+            novo[d] = { ...seg, aberto: true };
+        });
+        setDias(novo);
+        onChange(JSON.stringify(novo));
+    }
+
+    return (
+        <div className="space-y-2">
+            <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-stone-700">Horário de funcionamento</label>
+                <button type="button" onClick={copiarUteis}
+                    className="text-xs text-amber-600 hover:underline">
+                    Copiar seg. para dias úteis
+                </button>
+            </div>
+            <div className="rounded-xl ring-1 ring-stone-200 overflow-hidden divide-y divide-stone-100">
+                {DIAS_SEMANA.map((d) => (
+                    <div key={d.id} className={`flex items-center gap-3 px-3 py-2.5 ${dias[d.id].aberto ? 'bg-white' : 'bg-stone-50'}`}>
+                        <label className="flex items-center gap-2 w-24 shrink-0 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={dias[d.id].aberto}
+                                onChange={(e) => toggleDia(d.id, e.target.checked)}
+                                className="h-4 w-4 rounded border-stone-300 accent-amber-500"
+                            />
+                            <span className={`text-sm font-medium ${dias[d.id].aberto ? 'text-stone-800' : 'text-stone-400'}`}>
+                                {d.label}
+                            </span>
+                        </label>
+
+                        {dias[d.id].aberto ? (
+                            <div className="flex items-center gap-2 flex-1">
+                                <input
+                                    type="time"
+                                    value={dias[d.id].de}
+                                    onChange={(e) => atualizar(d.id, 'de', e.target.value)}
+                                    className="input w-auto flex-1 min-w-0 text-center text-sm"
+                                />
+                                <span className="text-xs text-stone-400 shrink-0">às</span>
+                                <input
+                                    type="time"
+                                    value={dias[d.id].ate}
+                                    onChange={(e) => atualizar(d.id, 'ate', e.target.value)}
+                                    className="input w-auto flex-1 min-w-0 text-center text-sm"
+                                />
+                            </div>
+                        ) : (
+                            <span className="text-xs text-stone-400 italic">Fechado</span>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 const CATEGORIAS_ESTABELECIMENTO = [
     'Restaurante', 'Lanches', 'Pizzaria', 'Açaí e Sorvetes',
     'Salgados e Petiscos', 'Doces e Bolos', 'Bebidas', 'Marmita',
@@ -34,8 +129,31 @@ function formatReal(valor) {
     return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function InfoLinha({ label, valor }) {
+    if (!valor) return null;
+    return (
+        <div>
+            <p className="text-xs text-stone-400">{label}</p>
+            <p className="mt-0.5 text-sm text-stone-800">{valor}</p>
+        </div>
+    );
+}
+
+function formatarHorarioLeitura(raw) {
+    if (!raw) return null;
+    try {
+        const h = JSON.parse(raw);
+        const LABEL = { dom:'Dom', seg:'Seg', ter:'Ter', qua:'Qua', qui:'Qui', sex:'Sex', sab:'Sáb' };
+        const abertos = Object.entries(LABEL).filter(([id]) => h[id]?.aberto);
+        if (!abertos.length) return 'Nenhum dia configurado';
+        return abertos.map(([id]) => `${LABEL[id]}: ${h[id].de}–${h[id].ate}`).join(' · ');
+    } catch { return raw; }
+}
+
 function FormEdicao({ estabelecimento }) {
-    const { data, setData, post, processing, errors } = useForm({
+    const [editando, setEditando] = useState(false);
+
+    const { data, setData, post, processing, errors, reset } = useForm({
         _method:          'PUT',
         nome:             estabelecimento.nome,
         nome_responsavel: estabelecimento.nome_responsavel ?? '',
@@ -62,29 +180,96 @@ function FormEdicao({ estabelecimento }) {
 
     function submit(e) {
         e.preventDefault();
-        post(`/empreendedor/painel/${estabelecimento.id}`, { forceFormData: true });
+        post(`/empreendedor/painel/${estabelecimento.id}`, {
+            forceFormData: true,
+            onSuccess: () => setEditando(false),
+        });
     }
 
+    function cancelar() {
+        reset();
+        setPreviewLogo(estabelecimento.logo);
+        setEditando(false);
+    }
+
+    /* ── MODO LEITURA ─────────────────────────────────── */
+    if (!editando) {
+        return (
+            <div className="space-y-5">
+                {/* Logo + nome */}
+                <div className="flex items-center gap-4">
+                    {estabelecimento.logo ? (
+                        <img src={estabelecimento.logo} alt="Logo" className="h-20 w-20 rounded-xl object-cover ring-1 ring-stone-200" />
+                    ) : (
+                        <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-stone-100 ring-1 ring-stone-200 text-3xl">🍽️</div>
+                    )}
+                    <div>
+                        <p className="text-lg font-bold text-stone-800">{estabelecimento.nome}</p>
+                        <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs text-stone-500">{estabelecimento.categoria}</span>
+                    </div>
+                </div>
+
+                {estabelecimento.descricao && (
+                    <p className="text-sm text-stone-600 leading-relaxed">{estabelecimento.descricao}</p>
+                )}
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <InfoLinha label="Responsável" valor={estabelecimento.nome_responsavel} />
+                    <InfoLinha label="E-mail de contato" valor={estabelecimento.email_contato} />
+                    <InfoLinha label="WhatsApp" valor={estabelecimento.whatsapp} />
+                    <InfoLinha label="Chave Pix" valor={estabelecimento.chave_pix} />
+                </div>
+
+                <div>
+                    <p className="text-xs text-stone-400">Horário de funcionamento</p>
+                    <p className="mt-0.5 text-sm text-stone-800">
+                        {formatarHorarioLeitura(estabelecimento.horario) ?? <span className="italic text-stone-400">Não configurado</span>}
+                    </p>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                    {estabelecimento.aceita_delivery && (
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-200">
+                            Delivery
+                            {estabelecimento.taxa_entrega > 0
+                                ? ` · R$ ${Number(estabelecimento.taxa_entrega).toFixed(2).replace('.', ',')}`
+                                : ' · grátis'}
+                        </span>
+                    )}
+                    {estabelecimento.aceita_retirada && (
+                        <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700 ring-1 ring-green-200">
+                            Retirada no local
+                        </span>
+                    )}
+                </div>
+
+                <button
+                    type="button"
+                    onClick={() => setEditando(true)}
+                    className="rounded-xl border border-amber-400 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100">
+                    ✏️ Editar perfil
+                </button>
+            </div>
+        );
+    }
+
+    /* ── MODO EDIÇÃO ──────────────────────────────────── */
     return (
         <form onSubmit={submit} className="space-y-5">
             {/* Logo */}
             <div>
                 <label className="mb-1 block text-sm font-medium text-stone-700">
-                    Logo do estabelecimento <span className="font-normal text-stone-400">(opcional · JPG/PNG · máx. 2 MB)</span>
+                    Logo <span className="font-normal text-stone-400">(JPG/PNG · máx. 2 MB)</span>
                 </label>
                 <div className="flex items-center gap-4">
                     {previewLogo ? (
                         <img src={previewLogo} alt="Logo" className="h-20 w-20 rounded-xl object-cover ring-1 ring-stone-200" />
                     ) : (
-                        <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-stone-100 ring-1 ring-stone-200 text-2xl">
-                            🍽️
-                        </div>
+                        <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-stone-100 ring-1 ring-stone-200 text-2xl">🍽️</div>
                     )}
-                    <div>
-                        <input type="file" accept="image/*" onChange={onLogoChange}
-                            className="block text-xs text-stone-600 file:mr-2 file:rounded-lg file:border-0 file:bg-amber-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-amber-700 hover:file:bg-amber-100" />
-                        {errors.logo && <p className="mt-1 text-xs text-red-600">{errors.logo}</p>}
-                    </div>
+                    <input type="file" accept="image/*" onChange={onLogoChange}
+                        className="block text-xs text-stone-600 file:mr-2 file:rounded-lg file:border-0 file:bg-amber-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-amber-700 hover:file:bg-amber-100" />
+                    {errors.logo && <p className="mt-1 text-xs text-red-600">{errors.logo}</p>}
                 </div>
             </div>
 
@@ -107,11 +292,10 @@ function FormEdicao({ estabelecimento }) {
                 <textarea value={data.descricao} onChange={(e) => setData('descricao', e.target.value)} rows={2} className="input" />
             </div>
 
-            <div>
-                <label className="mb-1 block text-sm font-medium text-stone-700">Horário de funcionamento</label>
-                <input type="text" value={data.horario} onChange={(e) => setData('horario', e.target.value)}
-                    className="input" placeholder="Ex: Seg a Sex: 10h–22h | Sáb e Dom: 11h–23h" />
-            </div>
+            <HorarioEditor
+                value={data.horario}
+                onChange={(val) => setData('horario', val)}
+            />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -160,17 +344,22 @@ function FormEdicao({ estabelecimento }) {
                 </div>
             )}
 
-            <button type="submit" disabled={processing}
-                className="rounded-xl bg-amber-500 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-amber-600 disabled:opacity-60">
-                {processing ? 'Salvando…' : 'Salvar alterações'}
-            </button>
+            <div className="flex gap-3">
+                <button type="button" onClick={cancelar}
+                    className="rounded-xl border border-stone-300 px-5 py-2.5 text-sm font-medium text-stone-600 transition hover:bg-stone-50">
+                    Cancelar
+                </button>
+                <button type="submit" disabled={processing}
+                    className="rounded-xl bg-amber-500 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-amber-600 disabled:opacity-60">
+                    {processing ? 'Salvando…' : 'Salvar alterações'}
+                </button>
+            </div>
         </form>
     );
 }
 
 function FormEditarItem({ item, onCancelar }) {
     const { data, setData, post, processing, errors } = useForm({
-        _method:      'PUT',
         categoria:    item.categoria,
         nome:         item.nome,
         descricao:    item.descricao ?? '',
@@ -273,6 +462,147 @@ function FormEditarItem({ item, onCancelar }) {
     );
 }
 
+function FormPromocao({ estabelecimento }) {
+    const temAtiva = !!(estabelecimento.promocao || estabelecimento.promocao_imagem);
+    const [modo, setModo] = useState(estabelecimento.promocao_imagem ? 'imagem' : 'texto');
+    const [previewImg, setPreviewImg] = useState(estabelecimento.promocao_imagem ?? null);
+
+    const { data, setData, post, processing, errors, reset } = useForm({
+        tipo:             modo,
+        promocao:         estabelecimento.promocao ?? '',
+        promocao_imagem:  null,
+    });
+
+    function escolherModo(m) {
+        setModo(m);
+        setData('tipo', m);
+    }
+
+    function onImagemChange(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        setData((d) => ({ ...d, promocao_imagem: file }));
+        setPreviewImg(URL.createObjectURL(file));
+    }
+
+    function salvar(e) {
+        e.preventDefault();
+        post(`/empreendedor/painel/${estabelecimento.id}/promocao`, { forceFormData: true });
+    }
+
+    function remover() {
+        if (!confirm('Remover a promoção ativa?')) return;
+        post(`/empreendedor/painel/${estabelecimento.id}/promocao`, {
+            data: { tipo: 'remover' },
+        });
+    }
+
+    return (
+        <div className="space-y-5">
+            {/* Preview da promoção ativa */}
+            {temAtiva && (
+                <div className="rounded-xl ring-1 ring-amber-300 overflow-hidden">
+                    <div className="flex items-center justify-between bg-amber-50 px-4 py-2.5">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Promoção ativa agora</p>
+                        <button type="button" onClick={remover}
+                            className="text-xs text-red-500 hover:underline font-medium">
+                            Remover promoção
+                        </button>
+                    </div>
+                    {estabelecimento.promocao_imagem ? (
+                        <img src={estabelecimento.promocao_imagem} alt="Promoção" className="w-full object-cover max-h-64" />
+                    ) : (
+                        <div className="flex items-start gap-3 bg-amber-400 px-4 py-3">
+                            <span className="text-xl shrink-0">🏷️</span>
+                            <p className="text-sm font-medium text-amber-950 whitespace-pre-wrap leading-relaxed">
+                                {estabelecimento.promocao}
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Toggle tipo */}
+            <div>
+                <p className="mb-2 text-sm font-medium text-stone-700">
+                    {temAtiva ? 'Alterar promoção' : 'Nova promoção'} — escolha o formato:
+                </p>
+                <div className="flex gap-2">
+                    <button type="button" onClick={() => escolherModo('texto')}
+                        className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                            modo === 'texto' ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                        }`}>
+                        ✏️ Texto
+                    </button>
+                    <button type="button" onClick={() => escolherModo('imagem')}
+                        className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                            modo === 'imagem' ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                        }`}>
+                        🖼️ Imagem
+                    </button>
+                </div>
+            </div>
+
+            <form onSubmit={salvar} className="space-y-4">
+                {modo === 'texto' && (
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-stone-700">
+                            Texto da promoção
+                            <span className="ml-1 font-normal text-stone-400">(máx. 500 caracteres)</span>
+                        </label>
+                        <textarea
+                            value={data.promocao}
+                            onChange={(e) => setData('promocao', e.target.value)}
+                            rows={4}
+                            maxLength={500}
+                            className="input"
+                            placeholder={'Ex: 🍕 Pizza grande por R$ 29,90 toda sexta!\nEx: Compre 2 X-burguer e ganhe 1 refri grátis.\nEx: Marmita do dia: arroz, feijão, frango e salada — R$ 12,00'}
+                        />
+                        <p className="mt-1 text-right text-xs text-stone-400">{data.promocao.length}/500</p>
+                        <p className="mt-1 text-xs text-stone-500">Aparece como card amarelo no topo do cardápio.</p>
+                    </div>
+                )}
+
+                {modo === 'imagem' && (
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-stone-700">
+                            Card de promoção
+                            <span className="ml-1 font-normal text-stone-400">(PNG ou JPG · 1350×1080 recomendado · máx. 4 MB)</span>
+                        </label>
+
+                        {previewImg && (
+                            <div className="mb-3 overflow-hidden rounded-xl ring-1 ring-stone-200">
+                                <img src={previewImg} alt="Preview" className="w-full object-cover max-h-56" />
+                            </div>
+                        )}
+
+                        <input
+                            type="file"
+                            accept="image/png,image/jpeg"
+                            onChange={onImagemChange}
+                            className="block text-xs text-stone-600 file:mr-2 file:rounded-lg file:border-0 file:bg-amber-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-amber-700 hover:file:bg-amber-100"
+                        />
+                        {errors.promocao_imagem && (
+                            <p className="mt-1 text-xs text-red-600">{errors.promocao_imagem}</p>
+                        )}
+                        <p className="mt-2 text-xs text-stone-500">
+                            Crie o card no Canva no formato <strong>1350×1080 px</strong> e exporte como PNG ou JPG.
+                            Ele será exibido em largura total no topo do cardápio.
+                        </p>
+                    </div>
+                )}
+
+                <button
+                    type="submit"
+                    disabled={processing || (modo === 'texto' && !data.promocao.trim()) || (modo === 'imagem' && !data.promocao_imagem)}
+                    className="rounded-xl bg-orange-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-orange-600 disabled:opacity-50 transition">
+                    {processing ? 'Salvando…' : temAtiva ? 'Atualizar promoção' : 'Publicar promoção'}
+                </button>
+            </form>
+        </div>
+    );
+}
+
 function CardapioManager({ estabelecimento }) {
     const [aba, setAba] = useState('lista');
     const [itemEditando, setItemEditando] = useState(null);
@@ -313,7 +643,7 @@ function CardapioManager({ estabelecimento }) {
 
     return (
         <div>
-            <div className="mb-4 flex gap-2">
+            <div className="mb-4 flex flex-wrap gap-2">
                 <button onClick={() => { setAba('lista'); setItemEditando(null); }}
                     className={`rounded-lg px-4 py-2 text-sm font-medium transition ${aba === 'lista' ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>
                     Itens ({estabelecimento.itens.length})
@@ -321,6 +651,13 @@ function CardapioManager({ estabelecimento }) {
                 <button onClick={() => { setAba('novo'); setItemEditando(null); }}
                     className={`rounded-lg px-4 py-2 text-sm font-medium transition ${aba === 'novo' ? 'bg-amber-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>
                     + Novo item
+                </button>
+                <button onClick={() => { setAba('promocao'); setItemEditando(null); }}
+                    className={`relative rounded-lg px-4 py-2 text-sm font-medium transition ${aba === 'promocao' ? 'bg-orange-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>
+                    🏷️ Promoção
+                    {estabelecimento.promocao && aba !== 'promocao' && (
+                        <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white" />
+                    )}
                 </button>
             </div>
 
@@ -386,6 +723,10 @@ function CardapioManager({ estabelecimento }) {
                         ))}
                     </div>
                 )
+            )}
+
+            {aba === 'promocao' && (
+                <FormPromocao estabelecimento={estabelecimento} />
             )}
 
             {aba === 'novo' && (

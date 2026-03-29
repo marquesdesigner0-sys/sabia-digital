@@ -1,6 +1,21 @@
 import { useState } from 'react';
 import { Head } from '@inertiajs/react';
 
+const DIAS_LABEL = { dom:'Dom', seg:'Seg', ter:'Ter', qua:'Qua', qui:'Qui', sex:'Sex', sab:'Sáb' };
+
+function formatarHorario(raw) {
+    if (!raw) return null;
+    try {
+        const h = JSON.parse(raw);
+        return Object.entries(DIAS_LABEL)
+            .filter(([id]) => h[id]?.aberto)
+            .map(([id]) => `${DIAS_LABEL[id]}: ${h[id].de}–${h[id].ate}`)
+            .join(' · ') || null;
+    } catch {
+        return raw; // fallback para texto livre antigo
+    }
+}
+
 function badge(label, cor) {
     return (
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${cor}`}>
@@ -98,8 +113,8 @@ export default function BaiaoFoodIndex({ estabelecimentos }) {
                                                     <p className="mt-1 text-sm text-stone-500 line-clamp-2">{e.descricao}</p>
                                                 )}
 
-                                                {e.horario && (
-                                                    <p className="mt-1 text-xs text-stone-400">🕐 {e.horario}</p>
+                                                {formatarHorario(e.horario) && (
+                                                    <p className="mt-1 text-xs text-stone-400">🕐 {formatarHorario(e.horario)}</p>
                                                 )}
 
                                                 <div className="mt-3 flex flex-wrap gap-2">

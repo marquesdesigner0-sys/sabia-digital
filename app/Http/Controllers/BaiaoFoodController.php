@@ -75,6 +75,8 @@ class BaiaoFoodController extends Controller
                 'aceita_delivery' => $estabelecimento->aceita_delivery,
                 'aceita_retirada' => $estabelecimento->aceita_retirada,
                 'taxa_entrega'    => (float) $estabelecimento->taxa_entrega,
+                'promocao'        => $estabelecimento->promocao,
+                'promocao_imagem' => $estabelecimento->promocao_imagem ? Storage::url($estabelecimento->promocao_imagem) : null,
             ],
             'cardapio' => $cardapio,
         ]);

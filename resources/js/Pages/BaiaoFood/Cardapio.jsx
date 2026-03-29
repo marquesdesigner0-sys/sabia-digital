@@ -1,17 +1,41 @@
 import { useState } from 'react';
 import { Head } from '@inertiajs/react';
 
+const DIAS_LABEL = { dom:'Dom', seg:'Seg', ter:'Ter', qua:'Qua', qui:'Qui', sex:'Sex', sab:'Sáb' };
+
+function formatarHorario(raw) {
+    if (!raw) return null;
+    try {
+        const h = JSON.parse(raw);
+        return Object.entries(DIAS_LABEL)
+            .filter(([id]) => h[id]?.aberto)
+            .map(([id]) => `${DIAS_LABEL[id]}: ${h[id].de}–${h[id].ate}`)
+            .join(' · ') || null;
+    } catch {
+        return raw;
+    }
+}
+
 function formatReal(valor) {
     return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function montarMensagemWhatsApp(estabelecimento, itens, tipo) {
+function montarMensagemWhatsApp(estabelecimento, itens, tipo, endereco) {
     const linhas = itens.map(
         (i) => `• ${i.qtd}x ${i.nome} — ${formatReal(i.preco * i.qtd)}`
     );
     const subtotal = itens.reduce((s, i) => s + i.preco * i.qtd, 0);
     const taxa = tipo === 'delivery' ? estabelecimento.taxa_entrega : 0;
     const total = subtotal + taxa;
+
+    const enderecoFormatado = endereco
+        ? [
+            `${endereco.rua}, ${endereco.numero}`,
+            endereco.bairro,
+            endereco.complemento || null,
+            endereco.referencia ? `Ref: ${endereco.referencia}` : null,
+          ].filter(Boolean).join(' — ')
+        : null;
 
     const msg = [
         `Olá! Gostaria de fazer um pedido — *${estabelecimento.nome}*`,
@@ -22,13 +46,200 @@ function montarMensagemWhatsApp(estabelecimento, itens, tipo) {
         taxa > 0 ? `Taxa de entrega: ${formatReal(taxa)}` : null,
         `*Total: ${formatReal(total)}*`,
         '',
-        tipo === 'delivery' ? 'Modalidade: Delivery' : 'Modalidade: Retirada no local',
+        tipo === 'delivery' ? '🛵 Modalidade: Delivery' : '🏪 Modalidade: Retirada no local',
+        enderecoFormatado ? `📍 Endereço: ${enderecoFormatado}` : null,
     ].filter((l) => l !== null).join('\n');
 
     return msg;
 }
 
-function ModalPix({ estabelecimento, itens, tipo, onFechar }) {
+function ModalEndereco({ onConfirmar, onFechar }) {
+    const [form, setForm] = useState({ rua: '', numero: '', bairro: '', complemento: '', referencia: '' });
+    const [erro, setErro] = useState('');
+
+    function set(campo, valor) {
+        setForm((f) => ({ ...f, [campo]: valor }));
+    }
+
+    function confirmar(e) {
+        e.preventDefault();
+        if (!form.rua.trim() || !form.numero.trim() || !form.bairro.trim()) {
+            setErro('Preencha rua, número e bairro.');
+            return;
+        }
+        onConfirmar(form);
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center px-0 sm:px-4">
+            <div className="w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-white shadow-xl ring-1 ring-stone-200 overflow-y-auto max-h-[90vh]">
+                <div className="sticky top-0 bg-white px-6 pt-5 pb-3 border-b border-stone-100 flex items-center justify-between">
+                    <div>
+                        <h2 className="font-bold text-stone-800">Endereço de entrega</h2>
+                        <p className="text-xs text-stone-500 mt-0.5">Onde deseja receber seu pedido?</p>
+                    </div>
+                    <button onClick={onFechar} className="text-stone-400 hover:text-stone-600 text-xl leading-none">✕</button>
+                </div>
+
+                <form onSubmit={confirmar} className="px-6 py-5 space-y-4">
+                    <div className="grid grid-cols-3 gap-3">
+                        <div className="col-span-2">
+                            <label className="mb-1 block text-xs font-medium text-stone-700">Rua / Avenida *</label>
+                            <input
+                                type="text"
+                                value={form.rua}
+                                onChange={(e) => set('rua', e.target.value)}
+                                className="input"
+                                placeholder="Ex: Rua das Flores"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-stone-700">Número *</label>
+                            <input
+                                type="text"
+                                value={form.numero}
+                                onChange={(e) => set('numero', e.target.value)}
+                                className="input"
+                                placeholder="123"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-stone-700">Bairro *</label>
+                        <input
+                            type="text"
+                            value={form.bairro}
+                            onChange={(e) => set('bairro', e.target.value)}
+                            className="input"
+                            placeholder="Ex: Centro"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-stone-700">
+                            Complemento <span className="font-normal text-stone-400">(opcional)</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={form.complemento}
+                            onChange={(e) => set('complemento', e.target.value)}
+                            className="input"
+                            placeholder="Apto, bloco, casa..."
+                        />
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-xs font-medium text-stone-700">
+                            Ponto de referência <span className="font-normal text-stone-400">(opcional)</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={form.referencia}
+                            onChange={(e) => set('referencia', e.target.value)}
+                            className="input"
+                            placeholder="Ex: Próximo à farmácia"
+                        />
+                    </div>
+
+                    {erro && <p className="text-sm text-red-600">{erro}</p>}
+
+                    <div className="flex gap-2 pt-1">
+                        <button type="button" onClick={onFechar}
+                            className="flex-1 rounded-xl border border-stone-300 py-3 text-sm font-medium text-stone-600 transition hover:bg-stone-50">
+                            Voltar
+                        </button>
+                        <button type="submit"
+                            className="flex-1 rounded-xl bg-amber-500 py-3 text-sm font-bold text-white transition hover:bg-amber-600">
+                            Confirmar endereço
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+function ModalCarrinho({ itens, estabelecimento, onAdicionar, onRemover, onFechar, onFazerPedido }) {
+    const subtotal = itens.reduce((s, i) => s + i.preco * i.qtd, 0);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center px-0 sm:px-4">
+            <div className="w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-white shadow-xl ring-1 ring-stone-200 flex flex-col max-h-[85vh]">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-stone-100 shrink-0">
+                    <h2 className="font-bold text-stone-800">Meu carrinho</h2>
+                    <button onClick={onFechar} className="text-stone-400 hover:text-stone-600 text-xl leading-none">✕</button>
+                </div>
+
+                {/* Lista de itens */}
+                <div className="overflow-y-auto flex-1 px-6 py-4 space-y-3">
+                    {itens.map((item) => (
+                        <div key={item.id} className="flex items-center gap-3 rounded-xl bg-stone-50 p-3 ring-1 ring-stone-100">
+                            {item.foto ? (
+                                <img src={item.foto} alt={item.nome} className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+                            ) : (
+                                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-xl">🍽️</div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-stone-800 truncate">{item.nome}</p>
+                                <p className="text-xs text-stone-500">{formatReal(item.preco)} cada</p>
+                                <p className="text-sm font-semibold text-amber-600">{formatReal(item.preco * item.qtd)}</p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <button
+                                    onClick={() => onRemover(item)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-200 text-stone-600 transition hover:bg-red-100 hover:text-red-600 text-lg font-bold"
+                                >
+                                    −
+                                </button>
+                                <span className="w-6 text-center text-sm font-bold text-stone-800">{item.qtd}</span>
+                                <button
+                                    onClick={() => onAdicionar(item)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-white transition hover:bg-amber-600 text-lg font-bold"
+                                >
+                                    +
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Rodapé com total e botões */}
+                <div className="px-6 pb-6 pt-3 border-t border-stone-100 shrink-0 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm text-stone-600">Subtotal</span>
+                        <span className="text-base font-bold text-stone-800">{formatReal(subtotal)}</span>
+                    </div>
+                    {estabelecimento.taxa_entrega > 0 && (
+                        <p className="text-xs text-stone-400">
+                            + taxa de entrega de {formatReal(estabelecimento.taxa_entrega)} para delivery
+                        </p>
+                    )}
+                    <div className="flex gap-2 pt-1">
+                        <button
+                            onClick={onFechar}
+                            className="flex-1 rounded-xl border border-stone-300 py-3 text-sm font-medium text-stone-600 transition hover:bg-stone-50"
+                        >
+                            Continuar
+                        </button>
+                        <button
+                            onClick={onFazerPedido}
+                            className="flex-1 rounded-xl bg-amber-500 py-3 text-sm font-bold text-white transition hover:bg-amber-600"
+                        >
+                            Fazer pedido
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ModalPix({ estabelecimento, itens, tipo, endereco, onFechar }) {
     const [copiado, setCopiado] = useState(false);
     const subtotal = itens.reduce((s, i) => s + i.preco * i.qtd, 0);
     const taxa = tipo === 'delivery' ? estabelecimento.taxa_entrega : 0;
@@ -59,6 +270,17 @@ function ModalPix({ estabelecimento, itens, tipo, onFechar }) {
                     <span className="text-sm text-stone-600">Total a pagar</span>
                     <span className="text-base font-bold text-stone-800">{formatReal(total)}</span>
                 </div>
+
+                {endereco && (
+                    <div className="mt-3 rounded-xl bg-stone-50 px-4 py-3 ring-1 ring-stone-200">
+                        <p className="text-xs text-stone-400">📍 Endereço de entrega</p>
+                        <p className="mt-0.5 text-sm text-stone-700">
+                            {endereco.rua}, {endereco.numero} — {endereco.bairro}
+                            {endereco.complemento ? ` · ${endereco.complemento}` : ''}
+                            {endereco.referencia ? ` · Ref: ${endereco.referencia}` : ''}
+                        </p>
+                    </div>
+                )}
 
                 <p className="mt-3 text-xs text-stone-400">
                     Após o pagamento, entre em contato com o estabelecimento para confirmar o pedido.
@@ -127,8 +349,11 @@ function ModalTipoEntrega({ estabelecimento, onEscolher, onFechar }) {
 
 export default function Cardapio({ estabelecimento, cardapio }) {
     const [carrinho, setCarrinho] = useState({});
-    const [modal, setModal] = useState(null); // null | 'tipo' | 'pix'
+    const [modal, setModal] = useState(null); // null | 'tipo' | 'endereco' | 'pix'
     const [tipoEntrega, setTipoEntrega] = useState(null);
+    const [endereco, setEndereco] = useState(null);
+    const temPromocao = !!(estabelecimento.promocao || estabelecimento.promocao_imagem);
+    const [aba, setAba] = useState('cardapio');
 
     const categorias = Object.keys(cardapio);
 
@@ -153,9 +378,9 @@ export default function Cardapio({ estabelecimento, cardapio }) {
     const total = subtotal + taxa;
     const totalItens = itensCarrinho.reduce((s, i) => s + i.qtd, 0);
 
-    function pedirWhatsApp(tipo) {
+    function pedirWhatsApp(tipo, end) {
         const tel = estabelecimento.whatsapp.replace(/\D/g, '');
-        const msg = montarMensagemWhatsApp(estabelecimento, itensCarrinho, tipo);
+        const msg = montarMensagemWhatsApp(estabelecimento, itensCarrinho, tipo, end);
         window.open(`https://wa.me/55${tel}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
         setModal(null);
     }
@@ -166,15 +391,29 @@ export default function Cardapio({ estabelecimento, cardapio }) {
             setModal('tipo');
         } else {
             const tipo = tipoEntrega ?? (estabelecimento.aceita_delivery ? 'delivery' : 'retirada');
-            finalizarPedido(tipo);
+            avancarParaEntrega(tipo);
         }
     }
 
-    function finalizarPedido(tipo) {
+    function avancarParaEntrega(tipo) {
         setTipoEntrega(tipo);
         setModal(null);
+        if (tipo === 'delivery') {
+            setModal('endereco');
+        } else {
+            concluirPedido(tipo, null);
+        }
+    }
+
+    function concluirComEndereco(end) {
+        setEndereco(end);
+        setModal(null);
+        concluirPedido(tipoEntrega, end);
+    }
+
+    function concluirPedido(tipo, end) {
         if (estabelecimento.whatsapp) {
-            pedirWhatsApp(tipo);
+            pedirWhatsApp(tipo, end);
         } else {
             setModal('pix');
         }
@@ -209,8 +448,8 @@ export default function Cardapio({ estabelecimento, cardapio }) {
                                 {estabelecimento.descricao && (
                                     <p className="mt-1 text-sm text-stone-500">{estabelecimento.descricao}</p>
                                 )}
-                                {estabelecimento.horario && (
-                                    <p className="mt-1 text-xs text-stone-400">🕐 {estabelecimento.horario}</p>
+                                {formatarHorario(estabelecimento.horario) && (
+                                    <p className="mt-1 text-xs text-stone-400">🕐 {formatarHorario(estabelecimento.horario)}</p>
                                 )}
                             </div>
                         </div>
@@ -241,8 +480,62 @@ export default function Cardapio({ estabelecimento, cardapio }) {
                     </div>
                 </div>
 
-                {/* Cardápio */}
-                <main className="mx-auto max-w-3xl px-4 py-6">
+                {/* Abas */}
+                <div className="bg-white border-b border-stone-200">
+                    <div className="mx-auto max-w-3xl px-4 flex gap-1">
+                        <button
+                            onClick={() => setAba('cardapio')}
+                            className={`border-b-2 px-5 py-3 text-sm font-medium transition ${
+                                aba === 'cardapio'
+                                    ? 'border-amber-500 text-amber-600'
+                                    : 'border-transparent text-stone-500 hover:text-stone-800'
+                            }`}>
+                            Cardápio
+                        </button>
+                        {temPromocao && (
+                            <button
+                                onClick={() => setAba('promocoes')}
+                                className={`relative border-b-2 px-5 py-3 text-sm font-medium transition ${
+                                    aba === 'promocoes'
+                                        ? 'border-orange-500 text-orange-600'
+                                        : 'border-transparent text-stone-500 hover:text-stone-800'
+                                }`}>
+                                🏷️ Promoções
+                                {aba !== 'promocoes' && (
+                                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-orange-500" />
+                                )}
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Conteúdo da aba Promoções */}
+                {aba === 'promocoes' && (
+                    <div className="mx-auto max-w-3xl px-4 py-6">
+                        {estabelecimento.promocao_imagem ? (
+                            <div className="overflow-hidden rounded-2xl shadow-sm ring-1 ring-stone-200">
+                                <img
+                                    src={estabelecimento.promocao_imagem}
+                                    alt="Promoção"
+                                    className="w-full object-cover"
+                                />
+                            </div>
+                        ) : (
+                            <div className="flex items-start gap-4 rounded-2xl bg-amber-400 px-6 py-5 shadow-sm">
+                                <span className="text-3xl shrink-0">🏷️</span>
+                                <div>
+                                    <p className="text-xs font-bold uppercase tracking-wide text-amber-900 mb-1">Promoção ativa</p>
+                                    <p className="text-sm font-medium text-amber-950 whitespace-pre-wrap leading-relaxed">
+                                        {estabelecimento.promocao}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Conteúdo da aba Cardápio */}
+                <main className={`mx-auto max-w-3xl px-4 py-6 ${aba !== 'cardapio' ? 'hidden' : ''}`}>
                     {categorias.length === 0 ? (
                         <div className="rounded-2xl bg-white p-10 text-center ring-1 ring-stone-200">
                             <p className="text-stone-400">Nenhum item disponível no momento.</p>
@@ -313,18 +606,19 @@ export default function Cardapio({ estabelecimento, cardapio }) {
             {/* Carrinho fixo no rodapé */}
             {totalItens > 0 && (
                 <div className="fixed bottom-0 inset-x-0 z-40 border-t border-stone-200 bg-white px-4 py-3 shadow-lg">
-                    <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
-                        <div>
-                            <p className="text-sm font-medium text-stone-700">
-                                {totalItens} {totalItens === 1 ? 'item' : 'itens'} no carrinho
-                            </p>
-                            <p className="text-xs text-stone-500">
-                                Subtotal: {formatReal(subtotal)}
-                            </p>
-                        </div>
+                    <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+                        <button
+                            onClick={() => setModal('carrinho')}
+                            className="flex items-center gap-2 rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+                        >
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
+                                {totalItens}
+                            </span>
+                            Ver carrinho
+                        </button>
                         <button
                             onClick={iniciarPedido}
-                            className="rounded-xl bg-amber-500 px-6 py-3 text-sm font-bold text-white transition hover:bg-amber-600"
+                            className="flex-1 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-amber-600"
                         >
                             Fazer pedido · {formatReal(total)}
                         </button>
@@ -332,11 +626,31 @@ export default function Cardapio({ estabelecimento, cardapio }) {
                 </div>
             )}
 
+            {/* Modal: carrinho */}
+            {modal === 'carrinho' && (
+                <ModalCarrinho
+                    itens={itensCarrinho}
+                    estabelecimento={estabelecimento}
+                    onAdicionar={adicionar}
+                    onRemover={remover}
+                    onFechar={() => setModal(null)}
+                    onFazerPedido={() => { setModal(null); iniciarPedido(); }}
+                />
+            )}
+
             {/* Modal: escolha tipo de entrega */}
             {modal === 'tipo' && (
                 <ModalTipoEntrega
                     estabelecimento={estabelecimento}
-                    onEscolher={finalizarPedido}
+                    onEscolher={avancarParaEntrega}
+                    onFechar={() => setModal(null)}
+                />
+            )}
+
+            {/* Modal: endereço de entrega */}
+            {modal === 'endereco' && (
+                <ModalEndereco
+                    onConfirmar={concluirComEndereco}
                     onFechar={() => setModal(null)}
                 />
             )}
@@ -347,6 +661,7 @@ export default function Cardapio({ estabelecimento, cardapio }) {
                     estabelecimento={estabelecimento}
                     itens={itensCarrinho}
                     tipo={tipoEntrega ?? 'retirada'}
+                    endereco={endereco}
                     onFechar={() => setModal(null)}
                 />
             )}

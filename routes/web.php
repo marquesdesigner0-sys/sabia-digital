@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BaiaoFoodController;
 use App\Http\Controllers\CalendarioEscolarController;
+use App\Http\Controllers\CursoController;
 use App\Http\Controllers\DocumentoMatriculaController;
 use App\Http\Controllers\EmpreendedorController;
 use App\Http\Controllers\EscolaController;
@@ -29,6 +30,19 @@ Route::middleware('auth')->group(function () {
     Route::get('/baiao-food', [BaiaoFoodController::class, 'index'])->name('baiao-food.index');
     Route::get('/baiao-food/{estabelecimento}', [BaiaoFoodController::class, 'show'])->name('baiao-food.show');
 
+    // Cursos e Treinamentos
+    Route::get('/empreendedor/cursos', [CursoController::class, 'index'])->name('cursos.index');
+    Route::get('/empreendedor/cursos/{curso}', [CursoController::class, 'show'])->name('cursos.show');
+    Route::post('/empreendedor/cursos/{curso}/inscrever', [CursoController::class, 'inscrever'])->name('cursos.inscrever');
+    Route::post('/empreendedor/inscricoes/{inscricao}/cancelar', [CursoController::class, 'cancelar'])->name('cursos.cancelar');
+
+    // Empreendedor — hub (sem auth extra)
+    Route::get('/empreendedor', function () {
+        return Inertia::render('Empreendedor/Index', [
+            'user' => auth()->user()->only('name', 'email'),
+        ]);
+    })->name('empreendedor.index');
+
     // Empreendedor — auth do estabelecimento
     Route::get('/empreendedor/login', [EmpreendedorController::class, 'showLogin'])->name('empreendedor.login');
     Route::post('/empreendedor/login', [EmpreendedorController::class, 'login'])->name('empreendedor.login.post');
@@ -42,6 +56,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/empreendedor/painel/{estabelecimento}', [EmpreendedorController::class, 'atualizar'])->name('empreendedor.atualizar');
         Route::post('/empreendedor/painel/{estabelecimento}/toggle-aberto', [EmpreendedorController::class, 'toggleAberto'])->name('empreendedor.toggle-aberto');
         Route::post('/empreendedor/painel/{estabelecimento}/itens', [EmpreendedorController::class, 'adicionarItem'])->name('empreendedor.itens.store');
+        Route::post('/empreendedor/painel/{estabelecimento}/promocao', [EmpreendedorController::class, 'salvarPromocao'])->name('empreendedor.promocao');
         Route::post('/empreendedor/itens/{item}/toggle', [EmpreendedorController::class, 'toggleItem'])->name('empreendedor.itens.toggle');
         Route::post('/empreendedor/itens/{item}', [EmpreendedorController::class, 'editarItem'])->name('empreendedor.itens.update');
         Route::delete('/empreendedor/itens/{item}', [EmpreendedorController::class, 'removerItem'])->name('empreendedor.itens.destroy');

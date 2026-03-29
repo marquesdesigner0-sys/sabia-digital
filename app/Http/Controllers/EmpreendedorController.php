@@ -136,6 +136,8 @@ class EmpreendedorController extends Controller
                 'aceita_retirada' => $estabelecimento->aceita_retirada,
                 'taxa_entrega'    => (float) $estabelecimento->taxa_entrega,
                 'horario'         => $estabelecimento->horario,
+                'promocao'        => $estabelecimento->promocao,
+                'promocao_imagem' => $estabelecimento->promocao_imagem ? Storage::url($estabelecimento->promocao_imagem) : null,
                 'aberto'          => $estabelecimento->aberto,
                 'status'          => $estabelecimento->status,
                 'itens'           => $estabelecimento->itensCardapio->map(fn($i) => [
@@ -166,7 +168,7 @@ class EmpreendedorController extends Controller
             'aceita_delivery'  => ['boolean'],
             'aceita_retirada'  => ['boolean'],
             'taxa_entrega'     => ['nullable', 'numeric', 'min:0'],
-            'horario'          => ['nullable', 'string', 'max:255'],
+            'horario'          => ['nullable', 'string', 'max:2000'],
             'logo'             => ['nullable', 'image', 'max:2048'],
         ], [
             'logo.image' => 'O arquivo deve ser uma imagem.',
@@ -283,6 +285,54 @@ class EmpreendedorController extends Controller
         $item->update(['disponivel' => ! $item->disponivel]);
 
         return back();
+    }
+
+    public function salvarPromocao(Request $request, Estabelecimento $estabelecimento): RedirectResponse
+    {
+        abort_if($estabelecimento->id !== session('estabelecimento_id'), 403);
+
+        $request->validate([
+            'tipo'            => ['required', 'in:texto,imagem,remover'],
+            'promocao'        => ['nullable', 'string', 'max:500'],
+            'promocao_imagem' => ['nullable', 'image', 'max:4096', 'mimes:png,jpg,jpeg'],
+        ], [
+            'promocao_imagem.image' => 'O arquivo deve ser uma imagem.',
+            'promocao_imagem.max'   => 'A imagem deve ter no máximo 4 MB.',
+            'promocao_imagem.mimes' => 'Use PNG ou JPG.',
+        ]);
+
+        $dados = ['promocao' => null, 'promocao_imagem' => $estabelecimento->promocao_imagem];
+
+        if ($request->tipo === 'remover') {
+            if ($estabelecimento->promocao_imagem) {
+                Storage::disk('public')->delete($estabelecimento->promocao_imagem);
+            }
+            $dados = ['promocao' => null, 'promocao_imagem' => null];
+            $estabelecimento->update($dados);
+            return back()->with('sucesso', 'Promoção removida.');
+        }
+
+        if ($request->tipo === 'texto') {
+            // Limpa imagem anterior se existir
+            if ($estabelecimento->promocao_imagem) {
+                Storage::disk('public')->delete($estabelecimento->promocao_imagem);
+            }
+            $dados = ['promocao' => $request->promocao ?: null, 'promocao_imagem' => null];
+        }
+
+        if ($request->tipo === 'imagem' && $request->hasFile('promocao_imagem')) {
+            if ($estabelecimento->promocao_imagem) {
+                Storage::disk('public')->delete($estabelecimento->promocao_imagem);
+            }
+            $dados = [
+                'promocao'        => null,
+                'promocao_imagem' => $request->file('promocao_imagem')->store('promocoes', 'public'),
+            ];
+        }
+
+        $estabelecimento->update($dados);
+
+        return back()->with('sucesso', 'Promoção atualizada.');
     }
 
     public function removerItem(ItemCardapio $item): RedirectResponse

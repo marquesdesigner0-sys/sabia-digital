@@ -17,10 +17,10 @@ const modulosInternos = [
         cor: 'border-red-400 hover:bg-red-50',
     },
     {
-        href: '/empreendedor/login',
+        href: '/empreendedor',
         emoji: '🏪',
         titulo: 'Empreendedor',
-        descricao: 'Gerencie seu estabelecimento',
+        descricao: 'Cursos, treinamentos e marketplace',
         cor: 'border-emerald-400 hover:bg-emerald-50',
     },
 ];
