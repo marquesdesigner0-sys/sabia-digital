@@ -30,6 +30,13 @@ const modulosInternos = [
         descricao: 'Notícias, eventos e editais',
         cor: 'border-blue-400 hover:bg-blue-50',
     },
+    {
+        href: '/telefones',
+        emoji: '📞',
+        titulo: 'Telefones Úteis',
+        descricao: 'Secretarias, UBS e serviços municipais',
+        cor: 'border-teal-400 hover:bg-teal-50',
+    },
 ];
 
 const modulosExternos = [

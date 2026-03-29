@@ -15,6 +15,7 @@ class Noticia extends Model
         'categoria',
         'imagem',
         'publicado',
+        'destaque',
         'publicado_em',
     ];
 
@@ -22,6 +23,7 @@ class Noticia extends Model
     {
         return [
             'publicado'    => 'boolean',
+            'destaque'     => 'boolean',
             'publicado_em' => 'datetime',
         ];
     }

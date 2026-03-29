@@ -27,9 +27,42 @@ class NoticiaController extends Controller
 
     public function index(Request $request): Response
     {
-        $categoria = $request->query('categoria', 'saude');
+        $categoria = $request->query('categoria'); // null = tela inicial de destaques
 
-        // Garantir que a categoria é válida
+        // Contagem por categoria para badges
+        $contagens = Noticia::where('publicado', true)
+            ->selectRaw('categoria, count(*) as total')
+            ->groupBy('categoria')
+            ->pluck('total', 'categoria')
+            ->toArray();
+
+        $mapNoticia = fn($n) => [
+            'id'           => $n->id,
+            'titulo'       => $n->titulo,
+            'resumo'       => $n->resumo,
+            'categoria'    => $n->categoria,
+            'imagem'       => $n->imagem ? Storage::url($n->imagem) : null,
+            'publicado_em' => $n->publicado_em?->format('d/m/Y'),
+        ];
+
+        // ── Tela inicial: destaques ──────────────────────────────────────────
+        if ($categoria === null) {
+            $destaques = Noticia::where('publicado', true)
+                ->where('destaque', true)
+                ->orderByDesc('publicado_em')
+                ->get()
+                ->map($mapNoticia);
+
+            return Inertia::render('Noticias/Index', [
+                'noticias'   => [],
+                'destaques'  => $destaques,
+                'categoria'  => null,
+                'contagens'  => $contagens,
+                'cronograma' => null,
+            ]);
+        }
+
+        // ── Categoria selecionada ────────────────────────────────────────────
         if (! array_key_exists($categoria, self::CATEGORIAS)) {
             $categoria = 'saude';
         }
@@ -38,21 +71,7 @@ class NoticiaController extends Controller
             ->where('categoria', $categoria)
             ->orderByDesc('publicado_em')
             ->get()
-            ->map(fn($n) => [
-                'id'           => $n->id,
-                'titulo'       => $n->titulo,
-                'resumo'       => $n->resumo,
-                'categoria'    => $n->categoria,
-                'imagem'       => $n->imagem ? Storage::url($n->imagem) : null,
-                'publicado_em' => $n->publicado_em?->format('d/m/Y'),
-            ]);
-
-        // Contagem por categoria para badges
-        $contagens = Noticia::where('publicado', true)
-            ->selectRaw('categoria, count(*) as total')
-            ->groupBy('categoria')
-            ->pluck('total', 'categoria')
-            ->toArray();
+            ->map($mapNoticia);
 
         // Dados extras para Coleta Urbana
         $cronograma = null;
@@ -72,6 +91,7 @@ class NoticiaController extends Controller
 
         return Inertia::render('Noticias/Index', [
             'noticias'   => $noticias,
+            'destaques'  => [],
             'categoria'  => $categoria,
             'contagens'  => $contagens,
             'cronograma' => $cronograma,

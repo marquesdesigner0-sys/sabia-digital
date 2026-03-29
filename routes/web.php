@@ -9,6 +9,17 @@ use App\Http\Controllers\EmpreendedorController;
 use App\Http\Controllers\EscolaController;
 use App\Http\Controllers\MatriculaController;
 use App\Http\Controllers\NoticiaController;
+use App\Http\Controllers\TelefoneController;
+use App\Http\Controllers\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\NoticiasController as AdminNoticiasController;
+use App\Http\Controllers\Admin\MatriculasController as AdminMatriculasController;
+use App\Http\Controllers\Admin\EstabelecimentosController as AdminEstabelecimentosController;
+use App\Http\Controllers\Admin\CursosController as AdminCursosController;
+use App\Http\Controllers\Admin\TelefonesController as AdminTelefonesController;
+use App\Http\Controllers\Admin\UsuariosController as AdminUsuariosController;
+use App\Http\Controllers\Admin\EscolasController as AdminEscolasController;
+use App\Http\Controllers\Admin\RelatoriosController as AdminRelatoriosController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -69,6 +80,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/informacoes', [NoticiaController::class, 'index'])->name('noticias.index');
     Route::get('/informacoes/{noticia}', [NoticiaController::class, 'show'])->name('noticias.show');
 
+    // Telefones úteis
+    Route::get('/telefones', [TelefoneController::class, 'index'])->name('telefones.index');
+
     // Educação
     Route::get('/educacao', [EscolaController::class, 'index'])->name('educacao.index');
     Route::get('/educacao/mapa', fn () => Inertia::render('Educacao/Mapa', [
@@ -91,4 +105,71 @@ Route::middleware('auth')->group(function () {
     Route::post('/educacao/matricula/{matricula}/documentos', [DocumentoMatriculaController::class, 'store'])->name('educacao.documentos.store');
     Route::delete('/educacao/documento/{documento}', [DocumentoMatriculaController::class, 'destroy'])->name('educacao.documentos.destroy');
     Route::get('/educacao/documento/{documento}/download', [DocumentoMatriculaController::class, 'download'])->name('educacao.documentos.download');
+});
+
+// ── Painel Admin — acesso isolado ─────────────────────────────────────────────
+Route::prefix('admin')->name('admin.')->group(function () {
+
+    // Login (público)
+    Route::get('/login', [AdminAuthController::class, 'showLogin'])->name('login');
+    Route::post('/login', [AdminAuthController::class, 'login'])->name('login.post');
+    Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
+
+    // Área protegida
+    Route::middleware('admin')->group(function () {
+        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+        // Notícias e Coleta Urbana
+        Route::get('/noticias', [AdminNoticiasController::class, 'index'])->name('noticias.index');
+        Route::post('/noticias', [AdminNoticiasController::class, 'store'])->name('noticias.store');
+        Route::put('/noticias/{noticia}', [AdminNoticiasController::class, 'update'])->name('noticias.update');
+        Route::delete('/noticias/{noticia}', [AdminNoticiasController::class, 'destroy'])->name('noticias.destroy');
+        Route::post('/noticias/{noticia}/toggle-publicado', [AdminNoticiasController::class, 'togglePublicado'])->name('noticias.toggle-publicado');
+        Route::post('/noticias/{noticia}/toggle-destaque', [AdminNoticiasController::class, 'toggleDestaque'])->name('noticias.toggle-destaque');
+
+        // Coleta Urbana
+        Route::post('/coleta', [AdminNoticiasController::class, 'storeColeta'])->name('coleta.store');
+        Route::put('/coleta/{coleta}', [AdminNoticiasController::class, 'updateColeta'])->name('coleta.update');
+        Route::delete('/coleta/{coleta}', [AdminNoticiasController::class, 'destroyColeta'])->name('coleta.destroy');
+
+        // Matrículas
+        Route::get('/matriculas', [AdminMatriculasController::class, 'index'])->name('matriculas.index');
+        Route::post('/matriculas/{matricula}/status', [AdminMatriculasController::class, 'updateStatus'])->name('matriculas.status');
+
+        // Estabelecimentos
+        Route::get('/estabelecimentos', [AdminEstabelecimentosController::class, 'index'])->name('estabelecimentos.index');
+        Route::post('/estabelecimentos/{estabelecimento}/aprovar', [AdminEstabelecimentosController::class, 'aprovar'])->name('estabelecimentos.aprovar');
+        Route::post('/estabelecimentos/{estabelecimento}/inativar', [AdminEstabelecimentosController::class, 'inativar'])->name('estabelecimentos.inativar');
+
+        // Cursos
+        Route::get('/cursos', [AdminCursosController::class, 'index'])->name('cursos.index');
+        Route::post('/cursos', [AdminCursosController::class, 'store'])->name('cursos.store');
+        Route::put('/cursos/{curso}', [AdminCursosController::class, 'update'])->name('cursos.update');
+        Route::delete('/cursos/{curso}', [AdminCursosController::class, 'destroy'])->name('cursos.destroy');
+
+        // Telefones úteis
+        Route::get('/telefones', [AdminTelefonesController::class, 'index'])->name('telefones.index');
+        Route::post('/telefones', [AdminTelefonesController::class, 'store'])->name('telefones.store');
+        Route::put('/telefones/{telefone}', [AdminTelefonesController::class, 'update'])->name('telefones.update');
+        Route::delete('/telefones/{telefone}', [AdminTelefonesController::class, 'destroy'])->name('telefones.destroy');
+        Route::post('/telefones/{telefone}/toggle', [AdminTelefonesController::class, 'toggle'])->name('telefones.toggle');
+
+        // Usuários do painel
+        Route::get('/usuarios', [AdminUsuariosController::class, 'index'])->name('usuarios.index');
+        Route::post('/usuarios', [AdminUsuariosController::class, 'store'])->name('usuarios.store');
+        Route::put('/usuarios/{usuario}', [AdminUsuariosController::class, 'update'])->name('usuarios.update');
+        Route::delete('/usuarios/{usuario}', [AdminUsuariosController::class, 'destroy'])->name('usuarios.destroy');
+
+        // Escolas
+        Route::get('/escolas', [AdminEscolasController::class, 'index'])->name('escolas.index');
+        Route::post('/escolas', [AdminEscolasController::class, 'store'])->name('escolas.store');
+        Route::put('/escolas/{escola}', [AdminEscolasController::class, 'update'])->name('escolas.update');
+        Route::delete('/escolas/{escola}', [AdminEscolasController::class, 'destroy'])->name('escolas.destroy');
+        Route::put('/escolas/{escola}/vagas', [AdminEscolasController::class, 'atualizarVagas'])->name('escolas.vagas');
+        Route::post('/escolas/{escola}/gestor', [AdminEscolasController::class, 'criarGestor'])->name('escolas.gestor.store');
+        Route::delete('/escolas/{escola}/gestor', [AdminEscolasController::class, 'removerGestor'])->name('escolas.gestor.destroy');
+
+        // Relatórios
+        Route::get('/relatorios', [AdminRelatoriosController::class, 'index'])->name('relatorios.index');
+    });
 });

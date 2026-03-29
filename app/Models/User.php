@@ -19,6 +19,8 @@ class User extends Authenticatable
         'cpf',
         'password',
         'role',
+        'admin_role',
+        'escola_id',
     ];
 
     protected $hidden = [
