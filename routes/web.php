@@ -1,21 +1,23 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BaiaoFoodController;
 use App\Http\Controllers\CalendarioEscolarController;
 use App\Http\Controllers\DocumentoMatriculaController;
+use App\Http\Controllers\EmpreendedorController;
 use App\Http\Controllers\EscolaController;
 use App\Http\Controllers\MatriculaController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-// Autenticação
+// Autenticação cidadão
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/cadastro', [AuthController::class, 'showCadastro']);
 Route::post('/cadastro', [AuthController::class, 'cadastro']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-// Área autenticada
+// Área autenticada (cidadão)
 Route::middleware('auth')->group(function () {
     Route::get('/', function () {
         return Inertia::render('Home', [
@@ -23,17 +25,39 @@ Route::middleware('auth')->group(function () {
         ]);
     });
 
+    // Baião Food — vitrine pública
+    Route::get('/baiao-food', [BaiaoFoodController::class, 'index'])->name('baiao-food.index');
+    Route::get('/baiao-food/{estabelecimento}', [BaiaoFoodController::class, 'show'])->name('baiao-food.show');
+
+    // Empreendedor — auth do estabelecimento
+    Route::get('/empreendedor/login', [EmpreendedorController::class, 'showLogin'])->name('empreendedor.login');
+    Route::post('/empreendedor/login', [EmpreendedorController::class, 'login'])->name('empreendedor.login.post');
+    Route::post('/empreendedor/logout', [EmpreendedorController::class, 'logout'])->name('empreendedor.logout');
+    Route::get('/empreendedor/cadastro', [EmpreendedorController::class, 'showCadastro'])->name('empreendedor.cadastro');
+    Route::post('/empreendedor/cadastro', [EmpreendedorController::class, 'cadastrar'])->name('empreendedor.cadastrar');
+
+    // Empreendedor — painel (requer sessão do estabelecimento)
+    Route::middleware('empreendedor')->group(function () {
+        Route::get('/empreendedor/painel', [EmpreendedorController::class, 'painel'])->name('empreendedor.painel');
+        Route::put('/empreendedor/painel/{estabelecimento}', [EmpreendedorController::class, 'atualizar'])->name('empreendedor.atualizar');
+        Route::post('/empreendedor/painel/{estabelecimento}/toggle-aberto', [EmpreendedorController::class, 'toggleAberto'])->name('empreendedor.toggle-aberto');
+        Route::post('/empreendedor/painel/{estabelecimento}/itens', [EmpreendedorController::class, 'adicionarItem'])->name('empreendedor.itens.store');
+        Route::post('/empreendedor/itens/{item}/toggle', [EmpreendedorController::class, 'toggleItem'])->name('empreendedor.itens.toggle');
+        Route::post('/empreendedor/itens/{item}', [EmpreendedorController::class, 'editarItem'])->name('empreendedor.itens.update');
+        Route::delete('/empreendedor/itens/{item}', [EmpreendedorController::class, 'removerItem'])->name('empreendedor.itens.destroy');
+    });
+
     // Educação
     Route::get('/educacao', [EscolaController::class, 'index'])->name('educacao.index');
     Route::get('/educacao/mapa', fn () => Inertia::render('Educacao/Mapa', [
         'escolas' => App\Models\Escola::orderBy('nome')->get()->map(fn($e) => [
-            'id'           => $e->id,
-            'nome'         => $e->nome,
-            'endereco'     => $e->endereco,
-            'total_vagas'  => $e->total_vagas,
+            'id'             => $e->id,
+            'nome'           => $e->nome,
+            'endereco'       => $e->endereco,
+            'total_vagas'    => $e->total_vagas,
             'vagas_ocupadas' => $e->matriculas()->whereIn('status', ['aprovada', 'em_analise'])->count(),
-            'latitude'     => $e->latitude  ? (float) $e->latitude  : null,
-            'longitude'    => $e->longitude ? (float) $e->longitude : null,
+            'latitude'       => $e->latitude  ? (float) $e->latitude  : null,
+            'longitude'      => $e->longitude ? (float) $e->longitude : null,
         ]),
     ]))->name('educacao.mapa');
     Route::get('/educacao/calendario', [CalendarioEscolarController::class, 'index'])->name('educacao.calendario');

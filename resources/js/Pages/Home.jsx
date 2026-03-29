@@ -9,6 +9,20 @@ const modulosInternos = [
         descricao: 'Escolas, matrículas e acompanhamento',
         cor: 'border-amber-400 hover:bg-amber-50',
     },
+    {
+        href: '/baiao-food',
+        emoji: '🍽️',
+        titulo: 'Baião Food',
+        descricao: 'Restaurantes e comércio local',
+        cor: 'border-red-400 hover:bg-red-50',
+    },
+    {
+        href: '/empreendedor/login',
+        emoji: '🏪',
+        titulo: 'Empreendedor',
+        descricao: 'Gerencie seu estabelecimento',
+        cor: 'border-emerald-400 hover:bg-emerald-50',
+    },
 ];
 
 const modulosExternos = [

@@ -14,6 +14,7 @@ class ItemCardapio extends Model
         'categoria',
         'nome',
         'descricao',
+        'foto',
         'preco',
         'disponivel',
     ];

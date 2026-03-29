@@ -8,16 +8,25 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Estabelecimento extends Model
 {
+    protected $hidden = ['password'];
+
     protected $fillable = [
         'user_id',
         'nome',
+        'cnpj',
+        'nome_responsavel',
+        'email_contato',
+        'password',
         'categoria',
         'descricao',
+        'logo',
         'whatsapp',
         'chave_pix',
         'aceita_delivery',
         'aceita_retirada',
         'taxa_entrega',
+        'horario',
+        'aberto',
         'status',
         'aprovado_em',
     ];
@@ -27,8 +36,9 @@ class Estabelecimento extends Model
         return [
             'aceita_delivery' => 'boolean',
             'aceita_retirada' => 'boolean',
-            'taxa_entrega' => 'decimal:2',
-            'aprovado_em' => 'datetime',
+            'taxa_entrega'    => 'decimal:2',
+            'aberto'          => 'boolean',
+            'aprovado_em'     => 'datetime',
         ];
     }
 
