@@ -83,14 +83,18 @@ class EscolasController extends BaseAdminController
     /** Atualiza apenas o total de vagas da escola. */
     public function atualizarVagas(Request $request, Escola $escola)
     {
-        $this->guardRole(self::ROLE_GERAL, self::ROLE_EDUCACAO);
+        $this->guardRole(self::ROLE_ESCOLA);
+
+        if ($escola->id !== $this->adminEscolaId()) {
+            abort(403);
+        }
 
         $data = $request->validate([
             'total_vagas' => 'required|integer|min:0',
         ]);
 
         $escola->update($data);
-        return redirect()->route('admin.escolas.index')->with('sucesso', "Vagas de {$escola->nome} atualizadas.");
+        return redirect()->route('admin.dashboard')->with('sucesso', "Vagas atualizadas com sucesso.");
     }
 
     /** Cria ou atualiza o gestor (login) da escola. */

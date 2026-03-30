@@ -104,69 +104,6 @@ function ModalEscola({ escola, onClose }) {
     );
 }
 
-// ── Modal Vagas ────────────────────────────────────────────────────────────────
-function ModalVagas({ escola, onClose }) {
-    const ocupadas = (escola.total_matriculas ?? 0);
-    const { data, setData, put, processing, errors } = useForm({
-        total_vagas: escola.total_vagas ?? 0,
-    });
-
-    function submit(e) {
-        e.preventDefault();
-        put(`/admin/escolas/${escola.id}/vagas`, { onSuccess: onClose });
-    }
-
-    return (
-        <Modal titulo={`Vagas — ${escola.nome}`} onClose={onClose}>
-            <div className="mb-4 rounded-xl bg-stone-50 px-4 py-3 text-sm ring-1 ring-stone-200">
-                <div className="flex justify-between text-stone-600">
-                    <span>Matrículas ativas</span>
-                    <strong>{ocupadas}</strong>
-                </div>
-                <div className="flex justify-between text-stone-600">
-                    <span>Vagas atuais</span>
-                    <strong>{escola.total_vagas}</strong>
-                </div>
-                <div className="mt-1 flex justify-between font-semibold">
-                    <span className="text-stone-500">Disponíveis</span>
-                    <span className={Math.max(0, escola.total_vagas - ocupadas) === 0 ? 'text-red-600' : 'text-green-600'}>
-                        {Math.max(0, escola.total_vagas - ocupadas)}
-                    </span>
-                </div>
-            </div>
-
-            <form onSubmit={submit} className="space-y-3">
-                <Campo label="Novo total de vagas" error={errors.total_vagas}>
-                    <Input
-                        type="number"
-                        min="0"
-                        value={data.total_vagas}
-                        onChange={e => setData('total_vagas', e.target.value)}
-                        error={errors.total_vagas}
-                    />
-                </Campo>
-
-                {Number(data.total_vagas) < ocupadas && (
-                    <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200">
-                        ⚠️ O novo total é menor que as matrículas ativas ({ocupadas}). As matrículas existentes não serão afetadas.
-                    </p>
-                )}
-
-                <div className="flex gap-2 pt-2">
-                    <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-stone-300 py-2 text-sm text-stone-600 hover:bg-stone-50">
-                        Cancelar
-                    </button>
-                    <button type="submit" disabled={processing}
-                        className="flex-1 rounded-xl bg-amber-500 py-2 text-sm font-bold text-stone-900 hover:bg-amber-400 disabled:opacity-60"
-                    >
-                        {processing ? 'Salvando…' : 'Atualizar vagas'}
-                    </button>
-                </div>
-            </form>
-        </Modal>
-    );
-}
-
 // ── Modal Gestor ───────────────────────────────────────────────────────────────
 function ModalGestor({ escola, onClose }) {
     const { data, setData, post, processing, errors } = useForm({
@@ -218,7 +155,7 @@ function ModalGestor({ escola, onClose }) {
 }
 
 // ── Card de escola ─────────────────────────────────────────────────────────────
-function CardEscola({ escola, onEditar, onVagas, onGestor, adminRole }) {
+function CardEscola({ escola, onEditar, onGestor, adminRole }) {
     function removerGestor() {
         if (!confirm(`Remover o acesso de ${escola.gestor.name} para ${escola.nome}?`)) return;
         router.delete(`/admin/escolas/${escola.id}/gestor`);
@@ -268,31 +205,6 @@ function CardEscola({ escola, onEditar, onVagas, onGestor, adminRole }) {
                 <span>🏫 {escola.total_vagas} vaga{escola.total_vagas !== 1 ? 's' : ''}</span>
             </div>
 
-            {/* Barra de ocupação */}
-            {escola.total_vagas > 0 && (() => {
-                const pct = Math.min(100, Math.round((escola.total_matriculas / escola.total_vagas) * 100));
-                const cor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-400' : 'bg-green-500';
-                return (
-                    <div className="mt-3">
-                        <div className="flex items-center justify-between text-xs text-stone-400 mb-1">
-                            <span>{escola.total_matriculas} / {escola.total_vagas} vagas</span>
-                            <span className={pct >= 90 ? 'font-bold text-red-600' : pct >= 70 ? 'text-amber-600' : 'text-green-600'}>{pct}%</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-stone-100">
-                            <div className={`h-full rounded-full transition-all ${cor}`} style={{ width: `${pct}%` }} />
-                        </div>
-                    </div>
-                );
-            })()}
-
-            {/* Botão rápido de vagas */}
-            <button
-                onClick={onVagas}
-                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-amber-50 py-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200 transition hover:bg-amber-100"
-            >
-                🏫 Gerenciar vagas
-            </button>
-
             {/* Pendentes */}
             {escola.pendentes > 0 && (
                 <a href="/admin/matriculas"
@@ -341,7 +253,6 @@ function CardEscola({ escola, onEditar, onVagas, onGestor, adminRole }) {
 export default function Escolas({ adminName, adminRole, escolas }) {
     const { flash } = usePage().props;
     const [modalEscola,  setModalEscola]  = useState(null); // null | 'nova' | escola{}
-    const [modalVagas,   setModalVagas]   = useState(null); // null | escola{}
     const [modalGestor,  setModalGestor]  = useState(null); // null | escola{}
 
     return (
@@ -352,12 +263,6 @@ export default function Escolas({ adminName, adminRole, escolas }) {
                 <ModalEscola
                     escola={modalEscola === 'nova' ? null : modalEscola}
                     onClose={() => setModalEscola(null)}
-                />
-            )}
-            {modalVagas && (
-                <ModalVagas
-                    escola={modalVagas}
-                    onClose={() => setModalVagas(null)}
                 />
             )}
             {modalGestor && (
@@ -406,7 +311,6 @@ export default function Escolas({ adminName, adminRole, escolas }) {
                                 escola={escola}
                                 adminRole={adminRole}
                                 onEditar={() => setModalEscola(escola)}
-                                onVagas={() => setModalVagas(escola)}
                                 onGestor={() => setModalGestor(escola)}
                             />
                         ))}

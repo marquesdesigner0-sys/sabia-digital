@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { useForm } from '@inertiajs/react';
+
 const STATUS_CONFIG = {
     pendente:   { label: 'Pendentes',   cor: 'text-amber-600', bg: 'bg-amber-500',  badge: 'bg-amber-100 text-amber-700' },
     em_analise: { label: 'Em análise',  cor: 'text-blue-600',  bg: 'bg-blue-500',   badge: 'bg-blue-100 text-blue-700' },
@@ -70,6 +73,16 @@ export default function DashboardEscola({ dados }) {
     const disponiveis = Math.max(0, (esc.total_vagas ?? 0) - ocupadas);
     const pctOcupado  = esc.total_vagas > 0 ? Math.round((ocupadas / esc.total_vagas) * 100) : 0;
     const corOcupacao = pctOcupado >= 90 ? 'text-red-600' : pctOcupado >= 70 ? 'text-amber-600' : 'text-green-600';
+
+    const [editandoVagas, setEditandoVagas] = useState(false);
+    const vagasForm = useForm({ total_vagas: esc.total_vagas ?? 0 });
+
+    function salvarVagas(e) {
+        e.preventDefault();
+        vagasForm.put(`/admin/escolas/${esc.escola_id}/vagas`, {
+            onSuccess: () => setEditandoVagas(false),
+        });
+    }
 
     return (
         <div className="space-y-6">
@@ -163,6 +176,64 @@ export default function DashboardEscola({ dados }) {
                     </div>
                 </div>
             )}
+
+            {/* Gerenciar vagas */}
+            <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
+                <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-wider text-stone-400">Vagas para matrícula</p>
+                    {!editandoVagas && (
+                        <button
+                            onClick={() => { vagasForm.setData('total_vagas', esc.total_vagas ?? 0); setEditandoVagas(true); }}
+                            className="rounded-lg bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100"
+                        >
+                            🏫 Gerenciar vagas
+                        </button>
+                    )}
+                </div>
+
+                {editandoVagas ? (
+                    <form onSubmit={salvarVagas} className="mt-3 flex items-end gap-3">
+                        <div className="flex-1">
+                            <label className="label">Novo total de vagas</label>
+                            <input
+                                type="number"
+                                min="0"
+                                value={vagasForm.data.total_vagas}
+                                onChange={e => vagasForm.setData('total_vagas', e.target.value)}
+                                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            />
+                            {vagasForm.errors.total_vagas && (
+                                <p className="mt-1 text-xs text-red-600">{vagasForm.errors.total_vagas}</p>
+                            )}
+                        </div>
+                        <button type="button" onClick={() => setEditandoVagas(false)}
+                            className="rounded-xl border border-stone-300 px-3 py-2 text-sm text-stone-500 hover:bg-stone-50"
+                        >
+                            Cancelar
+                        </button>
+                        <button type="submit" disabled={vagasForm.processing}
+                            className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-stone-900 hover:bg-amber-400 disabled:opacity-60"
+                        >
+                            {vagasForm.processing ? 'Salvando…' : 'Salvar'}
+                        </button>
+                    </form>
+                ) : (
+                    <div className="mt-3 flex items-center gap-6 text-sm">
+                        <div>
+                            <p className="text-xl font-bold text-stone-800">{esc.total_vagas ?? 0}</p>
+                            <p className="text-xs text-stone-400">total de vagas</p>
+                        </div>
+                        <div>
+                            <p className={`text-xl font-bold ${disponiveis === 0 ? 'text-red-600' : 'text-green-600'}`}>{disponiveis}</p>
+                            <p className="text-xs text-stone-400">disponíveis</p>
+                        </div>
+                        <div>
+                            <p className="text-xl font-bold text-stone-600">{ocupadas}</p>
+                            <p className="text-xs text-stone-400">ocupadas</p>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {/* Proporção por status */}
             {total > 0 && (
